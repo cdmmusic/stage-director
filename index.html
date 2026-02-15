@@ -1,0 +1,4223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stage Director — 3D 무대 시뮬레이터</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-tertiary: #1a1a26;
+    --bg-hover: #22223a;
+    --border: #2a2a3e;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a8;
+    --text-muted: #555570;
+    --accent: #ff6b35;
+    --accent-dim: #ff6b3540;
+    --accent-hover: #ff8555;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --cyan: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ─── HEADER ─── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+  }
+  #header .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; font-size: 14px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  #header .logo span { color: var(--text-muted); font-weight: 400; }
+  #header .project-name {
+    font-size: 13px; color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  #header .project-name:hover {
+    border-color: var(--border);
+    background: var(--bg-tertiary);
+  }
+  .header-controls {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .view-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+  }
+  .view-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .view-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  /* Save / Share buttons */
+  .header-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .save-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .save-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .save-btn.share { border-color: var(--cyan); color: var(--cyan); }
+  .save-btn.share:hover { background: rgba(6,182,212,0.15); }
+  .save-btn.saving { opacity: 0.6; pointer-events: none; }
+
+  /* Project Manager Modal */
+  .pm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
+  }
+  .pm-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 520px;
+    max-width: 92vw;
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .pm-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pm-header h3 { margin: 0; font-size: 15px; color: var(--text-primary); font-family: 'Noto Sans KR', sans-serif; font-weight: 600; }
+  .pm-close {
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 18px; padding: 4px 8px; border-radius: 4px; transition: all 0.12s;
+  }
+  .pm-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+  .pm-tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  .pm-tab {
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.12s;
+  }
+  .pm-tab:hover { color: var(--text-secondary); }
+  .pm-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .pm-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* Save Tab */
+  .pm-field { margin-bottom: 14px; }
+  .pm-field label {
+    display: block; font-size: 11px; color: var(--text-muted);
+    margin-bottom: 4px; font-family: 'Noto Sans KR', sans-serif;
+  }
+  .pm-field input[type="text"] {
+    width: 100%; background: var(--bg-tertiary);
+    border: 1px solid var(--border); color: var(--text-primary);
+    padding: 9px 12px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    box-sizing: border-box; transition: border-color 0.12s;
+  }
+  .pm-field input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  .pm-save-btn {
+    width: 100%; padding: 11px;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Noto Sans KR', sans-serif;
+    transition: opacity 0.12s;
+  }
+  .pm-save-btn:hover { opacity: 0.88; }
+  .pm-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .pm-status {
+    font-size: 11px; margin-top: 10px;
+    font-family: 'Noto Sans KR', sans-serif;
+    padding: 8px 10px; border-radius: 6px;
+    display: none;
+  }
+  .pm-status.success { display: block; background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+  .pm-status.error { display: block; background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+  /* Share section in save tab */
+  .pm-share-box {
+    margin-top: 16px; padding: 14px;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .pm-share-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: 700; color: var(--accent);
+    text-align: center; letter-spacing: 6px;
+    padding: 8px 0 12px;
+  }
+  .pm-share-url-row {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .pm-share-url-row input {
+    flex: 1; background: var(--bg-secondary);
+    border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 8px 10px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    box-sizing: border-box;
+  }
+  .pm-copy-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-family: 'Noto Sans KR', sans-serif;
+    white-space: nowrap; transition: all 0.12s;
+  }
+  .pm-copy-btn:hover { opacity: 0.85; }
+  .pm-copy-btn.copied { background: var(--green); }
+  .pm-share-hint {
+    font-size: 10px; color: var(--text-muted); margin-top: 8px;
+    font-family: 'Noto Sans KR', sans-serif; text-align: center;
+  }
+
+  /* List Tab */
+  .pm-list-empty {
+    text-align: center; padding: 30px 0;
+    color: var(--text-muted); font-size: 12px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .pm-project-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: all 0.12s;
+    cursor: pointer;
+  }
+  .pm-project-item:hover { border-color: var(--accent); background: var(--bg-tertiary); }
+  .pm-project-info { flex: 1; min-width: 0; }
+  .pm-project-title {
+    font-size: 13px; color: var(--text-primary);
+    font-family: 'Noto Sans KR', sans-serif; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pm-project-meta {
+    font-size: 10px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+  .pm-project-actions {
+    display: flex; gap: 4px; margin-left: 8px;
+    flex-shrink: 0;
+  }
+  .pm-project-actions button {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-secondary); padding: 4px 8px;
+    border-radius: 4px; font-size: 10px; cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif; transition: all 0.12s;
+  }
+  .pm-project-actions button:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .pm-project-actions button.load-btn:hover { border-color: var(--green); color: var(--green); }
+  .pm-project-actions button.del-btn:hover { border-color: var(--red); color: var(--red); }
+  .pm-loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+
+  /* Load by code input */
+  .pm-load-code-box {
+    display: flex; gap: 6px; align-items: center;
+    padding: 12px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .pm-load-code-box input {
+    flex: 1; background: var(--bg-secondary);
+    border: 1px solid var(--border); color: var(--text-primary);
+    padding: 8px 12px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 16px;
+    letter-spacing: 4px; text-transform: uppercase;
+    text-align: center; box-sizing: border-box;
+  }
+  .pm-load-code-box input::placeholder {
+    font-size: 11px; letter-spacing: 0; text-transform: none;
+  }
+  .pm-load-code-box input:focus { outline: none; border-color: var(--accent); }
+  .pm-load-code-box button {
+    background: var(--green); color: #fff; border: none;
+    padding: 8px 16px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-family: 'Noto Sans KR', sans-serif;
+    white-space: nowrap; transition: opacity 0.12s;
+  }
+  .pm-load-code-box button:hover { opacity: 0.85; }
+  .pm-audio-warning {
+    font-size: 10px; color: var(--text-muted);
+    padding: 6px 10px; background: rgba(234,179,8,0.1);
+    border: 1px solid rgba(234,179,8,0.3); border-radius: 6px;
+    margin-top: 8px;
+  }
+
+  /* ─── SIDEBAR ─── */
+  #sidebar {
+    position: fixed; top: 44px; left: 0; bottom: 0;
+    width: 260px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    z-index: 90;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-section {
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-section h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Upload area */
+  .upload-area {
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .upload-area:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .upload-area .icon { font-size: 24px; margin-bottom: 6px; }
+  .upload-area p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+  .upload-area.has-image {
+    padding: 6px;
+    border-style: solid;
+    border-color: var(--green);
+  }
+  .upload-area.has-image img {
+    width: 100%; border-radius: 4px;
+  }
+  #floorplan-input { display: none; }
+
+  /* Scale controls */
+  .scale-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  }
+  .scale-row label {
+    font-size: 11px; color: var(--text-secondary); min-width: 55px;
+  }
+  .scale-row input[type="number"] {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    width: 60px;
+  }
+  .scale-row span.unit {
+    font-size: 10px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Object Library */
+  .object-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .object-item {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .object-item:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+  }
+  .object-item.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .object-item .icon { font-size: 20px; margin-bottom: 4px; }
+  .object-item .name {
+    font-size: 10px; color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  /* Properties Panel */
+  .prop-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .prop-row label {
+    font-size: 11px; color: var(--text-secondary); min-width: 24px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .prop-row input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .color-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    display: inline-block;
+  }
+  .color-dot.active { border-color: var(--text-primary); }
+
+  .btn-delete {
+    width: 100%;
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 8px;
+    opacity: 0.8;
+  }
+  .btn-delete:hover { opacity: 1; }
+
+  /* Object List */
+  .obj-list-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.1s;
+  }
+  .obj-list-item:hover { background: var(--bg-hover); }
+  .obj-list-item.selected { background: var(--accent-dim); }
+  .obj-list-item .dot {
+    width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+  }
+  .obj-list-item .label { flex: 1; color: var(--text-secondary); }
+  .obj-list-item .type {
+    font-size: 9px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ─── RIGHT PANEL ─── */
+  #right-panel {
+    position: fixed; top: 44px; right: 0; bottom: 0;
+    width: 240px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    z-index: 90;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #right-panel.visible { display: flex; }
+
+  /* ─── CANVAS ─── */
+  #canvas-container {
+    position: fixed;
+    top: 44px; left: 260px; right: 0; bottom: 228px;
+    background: var(--bg-primary);
+  }
+  #canvas-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* ─── TIMELINE PANEL ─── */
+  #timeline-panel {
+    position: fixed;
+    bottom: 28px; left: 260px; right: 0;
+    height: 200px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    z-index: 96;
+    display: flex; flex-direction: column;
+    transition: height 0.25s ease;
+  }
+  #timeline-panel.collapsed {
+    height: 32px;
+  }
+  #timeline-panel.collapsed .tl-body { display: none; }
+
+  /* Timeline Header */
+  .tl-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px;
+    height: 32px; min-height: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tl-toggle {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 14px;
+    padding: 2px; transition: transform 0.25s;
+    display: flex; align-items: center;
+  }
+  .tl-toggle.collapsed { transform: rotate(180deg); }
+  .tl-transport {
+    display: flex; align-items: center; gap: 3px;
+  }
+  .tl-btn {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.12s;
+    position: relative;
+  }
+  .tl-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tl-btn.playing { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+  .tl-btn.active-loop { color: var(--cyan); border-color: var(--cyan); background: rgba(6,182,212,0.15); }
+  .tl-btn.disabled { opacity: 0.35; pointer-events: none; }
+  .tl-btn svg { width: 14px; height: 14px; }
+
+  .tl-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+
+  /* Volume control */
+  .tl-volume {
+    display: flex; align-items: center; gap: 4px; margin-left: 4px;
+  }
+  .tl-volume-icon {
+    font-size: 12px; cursor: pointer; color: var(--text-muted);
+    transition: color 0.12s; user-select: none;
+  }
+  .tl-volume-icon:hover { color: var(--text-primary); }
+  .tl-volume-icon.muted { color: var(--red); }
+  .tl-volume-slider {
+    -webkit-appearance: none;
+    width: 60px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  .tl-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: var(--text-secondary);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .tl-volume-slider::-webkit-slider-thumb:hover { background: var(--text-primary); }
+  .tl-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    min-width: 90px;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .tl-title {
+    font-size: 11px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1; text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tl-audio-upload {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--accent);
+    font-size: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: 'Noto Sans KR', sans-serif;
+    white-space: nowrap;
+  }
+  .tl-audio-upload:hover { background: var(--accent); color: #fff; }
+
+  /* Timeline Body */
+  .tl-body {
+    display: flex; flex-direction: column;
+    height: 168px;
+    overflow: hidden;
+  }
+
+  /* Waveform area - EXPLICIT height */
+  .tl-waveform-area {
+    position: relative;
+    height: 70px; min-height: 70px;
+    margin: 3px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .tl-waveform-area #waveform {
+    width: 100%;
+    height: 70px;
+  }
+  .tl-empty-wave {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    flex-direction: column; gap: 6px;
+    z-index: 2;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .tl-empty-wave.hidden { opacity: 0; pointer-events: none; }
+
+  /* ─── LYRICS STRIP ─── */
+  .tl-lyrics-strip {
+    display: flex; align-items: center;
+    height: 42px; min-height: 42px;
+    margin: 0 12px;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .lyrics-upload-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .lyrics-upload-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .lyrics-scroll-container {
+    flex: 1;
+    display: flex; align-items: center;
+    height: 38px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .lyrics-scroll-inner {
+    display: flex; align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    padding: 0 12px;
+    transition: transform 0.3s ease-out;
+    width: 100%;
+  }
+  .lyric-line {
+    font-size: 11px;
+    font-family: 'Noto Sans KR', sans-serif;
+    padding: 3px 10px;
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .lyric-line:hover { color: var(--text-secondary); }
+  .lyric-line.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .lyric-line.past {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+  .lyrics-empty {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  /* Cue markers on waveform */
+  .cue-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    cursor: pointer;
+    z-index: 5;
+    transition: width 0.1s, opacity 0.1s;
+  }
+  .cue-marker::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -1px; left: 4px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 1px 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .cue-marker:hover { width: 4px; cursor: ew-resize; }
+  .cue-marker.dragging { width: 4px; opacity: 0.7; z-index: 10; }
+  .cue-marker.copied { animation: cue-copied 0.4s ease; }
+  @keyframes cue-copied {
+    0%,100% { filter: brightness(1); }
+    50% { filter: brightness(2); }
+  }
+
+  .cue-marker.lighting { background: var(--yellow); }
+  .cue-marker.lighting::before { background: var(--yellow); color: #000; }
+  .cue-marker.video { background: var(--blue); }
+  .cue-marker.video::before { background: var(--blue); color: #fff; }
+  .cue-marker.sfx { background: var(--purple); }
+  .cue-marker.sfx::before { background: var(--purple); color: #fff; }
+  .cue-marker.pyro { background: var(--red); }
+  .cue-marker.pyro::before { background: var(--red); color: #fff; }
+  .cue-marker.stage { background: var(--green); }
+  .cue-marker.stage::before { background: var(--green); color: #000; }
+  .cue-marker.general { background: var(--text-secondary); }
+  .cue-marker.general::before { background: var(--text-secondary); color: #000; }
+
+  /* Cue strip (bottom row) */
+  .tl-cue-strip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 12px;
+    min-height: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .tl-cue-strip .add-cue-btn {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--accent);
+    font-size: 10px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .tl-cue-strip .add-cue-btn:hover { background: var(--accent); color: #fff; }
+  .tl-cue-tags {
+    display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto;
+    flex: 1;
+  }
+  .cue-tag {
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    transition: all 0.1s;
+  }
+  .cue-tag:hover { opacity: 0.8; }
+  .cue-tag.selected { border-color: var(--text-primary); }
+
+  /* Cue Edit Modal */
+  .cue-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cue-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    width: 380px;
+    max-width: 90vw;
+  }
+  .cue-modal h3 {
+    font-size: 14px; margin-bottom: 14px; color: var(--text-primary);
+  }
+  .cue-modal label {
+    font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cue-modal input, .cue-modal textarea, .cue-modal select {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Noto Sans KR', sans-serif;
+    margin-bottom: 10px;
+    resize: vertical;
+  }
+  .cue-modal textarea { min-height: 60px; }
+  .cue-modal select { cursor: pointer; }
+  .cue-modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;
+  }
+  .cue-modal-actions button {
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .cue-modal-actions .btn-save {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .cue-modal-actions .btn-cancel {
+    background: var(--bg-tertiary); color: var(--text-secondary);
+  }
+  .cue-modal-actions .btn-delete-cue {
+    background: transparent; color: var(--red); border-color: var(--red);
+    margin-right: auto;
+  }
+
+  /* ─── STATUS BAR ─── */
+  #status-bar {
+    position: fixed;
+    bottom: 0; left: 260px; right: 0;
+    height: 28px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    z-index: 95;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  #status-bar .sep {
+    width: 1px; height: 14px; background: var(--border);
+  }
+  #status-bar .coord { color: var(--text-secondary); }
+
+  /* ─── TOOLBAR (floating) ─── */
+  #toolbar {
+    position: fixed;
+    top: 56px; left: 272px;
+    display: flex; gap: 4px;
+    z-index: 95;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  .tool-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .tool-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+  .tool-btn svg { width: 16px; height: 16px; }
+
+  /* ─── HELP OVERLAY ─── */
+  #help-toast {
+    position: fixed;
+    bottom: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  #help-toast.visible { opacity: 1; }
+  #help-toast kbd {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-primary);
+  }
+
+  /* Preset buttons */
+  .preset-btn {
+    width: 100%;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  .preset-btn:hover {
+    border-color: var(--cyan);
+    background: rgba(6,182,212,0.08);
+  }
+  .preset-btn .preset-icon { font-size: 22px; }
+  .preset-btn .preset-info { display: flex; flex-direction: column; gap: 2px; }
+  .preset-btn .preset-info strong {
+    font-size: 12px; color: var(--text-primary); font-weight: 600;
+  }
+  .preset-btn .preset-info small {
+    font-size: 10px; color: var(--text-muted);
+  }
+  .preset-clear-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: all 0.15s;
+  }
+  .preset-clear-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">STAGE DIRECTOR <span>v0.1</span></div>
+  <div class="project-name" id="project-name" onclick="editProjectName()" title="클릭하여 프로젝트 이름 변경">YES24 LIVE HALL — 무대 배치</div>
+  <div class="header-controls">
+    <button class="save-btn" onclick="openProjectManager('save')" id="save-btn" title="프로젝트 저장 (Ctrl+S)">💾 저장</button>
+    <button class="save-btn" onclick="openProjectManager('list')" title="저장된 프로젝트 목록">📂 열기</button>
+    <button class="save-btn share" onclick="openProjectManager('share')" id="share-btn" title="공유 링크 생성">🔗 공유</button>
+    <div class="header-sep"></div>
+    <button class="view-btn" onclick="setCameraView('perspective')">3D</button>
+    <button class="view-btn" onclick="setCameraView('top')">평면</button>
+    <button class="view-btn" onclick="setCameraView('front')">정면</button>
+    <button class="view-btn" onclick="setCameraView('side')">측면</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <!-- Floorplan Upload -->
+  <div class="sidebar-section">
+    <h3>📐 도면 매핑</h3>
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('floorplan-input').click()">
+      <div class="icon">🏗️</div>
+      <p>평면도를 업로드하세요<br><span style="font-size:10px;color:var(--text-muted)">JPG / PNG / PDF</span></p>
+    </div>
+    <input type="file" id="floorplan-input" accept="image/*,.pdf,application/pdf">
+    <div id="pdf-page-control" style="display:none;">
+      <div class="scale-row">
+        <label>PDF 페이지</label>
+        <input type="number" id="pdf-page-num" value="1" min="1" step="1" style="width:50px;">
+        <span class="unit" id="pdf-page-total">/ 1</span>
+      </div>
+    </div>
+    <div class="scale-row">
+      <label>실측 폭</label>
+      <input type="number" id="scale-width" value="44" min="1" max="200" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="scale-row">
+      <label>실측 깊이</label>
+      <input type="number" id="scale-depth" value="52" min="1" max="200" step="0.1">
+      <span class="unit">m</span>
+    </div>
+    <div class="scale-row">
+      <label>투명도</label>
+      <input type="range" id="floorplan-opacity" min="0.1" max="1" step="0.05" value="0.85" style="flex:1;accent-color:var(--accent);">
+    </div>
+  </div>
+
+  <!-- Venue Preset -->
+  <div class="sidebar-section">
+    <h3>🏛️ 공연장 프리셋</h3>
+    <button class="preset-btn" onclick="loadVenuePreset('yes24')">
+      <span class="preset-icon">🎵</span>
+      <span class="preset-info">
+        <strong>YES24 LIVE HALL</strong>
+        <small>44m × 52m · 스탠딩 2,000석</small>
+      </span>
+    </button>
+    <div class="scale-row" style="margin-top:6px;">
+      <label>구조물</label>
+      <input type="range" id="structure-opacity" min="0.1" max="1" step="0.05" value="0.7" style="flex:1;accent-color:var(--cyan);">
+    </div>
+    <button class="preset-clear-btn" onclick="clearStructures()">구조물 전체 삭제</button>
+  </div>
+
+  <!-- Object Library -->
+  <div class="sidebar-section">
+    <h3>🎭 오브젝트 라이브러리</h3>
+    <div class="object-grid">
+      <div class="object-item" data-type="stage" onclick="selectObjectType('stage')">
+        <div class="icon">🎪</div>
+        <div class="name">무대 단상</div>
+      </div>
+      <div class="object-item" data-type="speaker" onclick="selectObjectType('speaker')">
+        <div class="icon">🔊</div>
+        <div class="name">스피커</div>
+      </div>
+      <div class="object-item" data-type="truss" onclick="selectObjectType('truss')">
+        <div class="icon">🔩</div>
+        <div class="name">트러스</div>
+      </div>
+      <div class="object-item" data-type="led" onclick="selectObjectType('led')">
+        <div class="icon">📺</div>
+        <div class="name">LED 스크린</div>
+      </div>
+      <div class="object-item" data-type="light" onclick="selectObjectType('light')">
+        <div class="icon">💡</div>
+        <div class="name">조명 기구</div>
+      </div>
+      <div class="object-item" data-type="riser" onclick="selectObjectType('riser')">
+        <div class="icon">📦</div>
+        <div class="name">라이저</div>
+      </div>
+      <div class="object-item" data-type="monitor" onclick="selectObjectType('monitor')">
+        <div class="icon">🖥️</div>
+        <div class="name">모니터 SP</div>
+      </div>
+      <div class="object-item" data-type="barrier" onclick="selectObjectType('barrier')">
+        <div class="icon">🚧</div>
+        <div class="name">바리케이드</div>
+      </div>
+    </div>
+    <p style="font-size:10px;color:var(--text-muted);margin-top:8px;text-align:center;">
+      선택 후 3D 바닥을 클릭하여 배치
+    </p>
+  </div>
+
+  <!-- Scene Object List -->
+  <div class="sidebar-section" style="flex:1;">
+    <h3>📋 씬 오브젝트</h3>
+    <div id="object-list"></div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL (Properties) -->
+<div id="right-panel">
+  <div class="sidebar-section">
+    <h3>⚙️ 오브젝트 속성</h3>
+    <div id="props-content">
+      <p style="font-size:11px;color:var(--text-muted);">오브젝트를 선택하세요</p>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <button class="tool-btn active" id="tool-select" title="선택 (V)" onclick="setTool('select')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+  </button>
+  <button class="tool-btn" id="tool-move" title="이동 (G)" onclick="setTool('move')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+  </button>
+  <button class="tool-btn" id="tool-rotate" title="회전 (R)" onclick="setTool('rotate')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><path d="M21 3v5h-5"/></svg>
+  </button>
+  <button class="tool-btn" id="tool-scale" title="크기 (F)" onclick="setTool('scale')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="8" height="8" rx="1"/><rect x="14" y="14" width="8" height="8" rx="1"/><path d="M10 6h4M6 10v4M14 18h-4M18 14v-4"/></svg>
+  </button>
+</div>
+
+<!-- CANVAS -->
+<div id="canvas-container"></div>
+
+<!-- TIMELINE PANEL -->
+<div id="timeline-panel">
+  <div class="tl-header">
+    <button class="tl-toggle" id="tl-toggle-btn" title="타임라인 접기/펼치기" onclick="toggleTimeline()">▼</button>
+    <div class="tl-transport">
+      <button class="tl-btn disabled" id="tl-stop" title="처음으로 (Home)" onclick="tlStop()">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="5" width="3" height="14" rx="1"/><path d="M20 5.5v13a1 1 0 01-1.6.8l-9-6.5a1 1 0 010-1.6l9-6.5a1 1 0 011.6.8z"/></svg>
+      </button>
+      <button class="tl-btn disabled" id="tl-rw" title="5초 뒤로 (←)" onclick="tlSkip(-5)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8L7 12l5.5 4V8z"/><path d="M19 8l-5.5 4L19 16V8z"/></svg>
+      </button>
+      <button class="tl-btn disabled" id="tl-play" title="재생/일시정지 (Space)" onclick="tlPlayPause()">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" id="tl-play-icon"><path d="M8 5.14v13.72a1 1 0 001.5.86l11.04-6.86a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z"/></svg>
+      </button>
+      <button class="tl-btn disabled" id="tl-ff" title="5초 앞으로 (→)" onclick="tlSkip(5)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 16l5.5-4-5.5-4v8z"/><path d="M5 16l5.5-4L5 8v8z"/></svg>
+      </button>
+      <div class="tl-sep"></div>
+      <button class="tl-btn disabled" id="tl-loop" title="반복 재생 (L)" onclick="tlToggleLoop()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
+      </button>
+      <div class="tl-volume">
+        <span class="tl-volume-icon" id="tl-vol-icon" onclick="tlToggleMute()" title="음소거 (M)">🔊</span>
+        <input type="range" class="tl-volume-slider" id="tl-vol-slider" min="0" max="100" value="80" oninput="tlSetVolume(this.value)">
+      </div>
+    </div>
+    <div class="tl-time" id="tl-time-display">00:00.0 / 00:00.0</div>
+    <span class="tl-title" id="tl-track-name">트랙 없음</span>
+    <label class="tl-audio-upload" for="audio-input">🎵 음원 업로드</label>
+    <input type="file" id="audio-input" accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,audio/*" style="display:none;">
+  </div>
+  <div class="tl-body">
+    <div class="tl-waveform-area" id="waveform-area">
+      <div id="waveform"></div>
+      <div class="tl-empty-wave" id="tl-empty-msg">
+        <span style="font-size:24px;">🎵</span>
+        <span>음원 파일을 여기에 드래그하거나<br>"음원 업로드" 버튼을 클릭하세요</span>
+        <span style="font-size:9px;color:var(--text-muted);">MP3 · WAV · OGG · M4A · FLAC</span>
+      </div>
+    </div>
+    <div class="tl-lyrics-strip">
+      <label class="lyrics-upload-btn" for="lrc-input" title="LRC 가사 파일 업로드">📝 가사</label>
+      <input type="file" id="lrc-input" accept=".lrc,.txt" style="display:none;">
+      <div class="lyrics-scroll-container" id="lyrics-container">
+        <div class="lyrics-scroll-inner" id="lyrics-inner">
+          <span class="lyrics-empty">LRC 가사 파일을 업로드하면 싱크 가사가 표시됩니다</span>
+        </div>
+      </div>
+    </div>
+    <div class="tl-cue-strip">
+      <button class="add-cue-btn" onclick="addCueAtCurrentTime()">+ 큐 추가</button>
+      <div class="tl-cue-tags" id="cue-tag-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <span id="status-mode">선택 모드</span>
+  <div class="sep"></div>
+  <span class="coord" id="status-cursor">X: 0.0 Z: 0.0</span>
+  <div class="sep"></div>
+  <span id="status-objects">오브젝트: 0</span>
+  <div class="sep"></div>
+  <span id="status-grid">그리드: 1m</span>
+</div>
+
+<!-- HELP TOAST -->
+<div id="help-toast">
+  <kbd>WASD</kbd> 이동 &nbsp; <kbd>QE</kbd> 상하 &nbsp; <kbd>Shift</kbd> 가속 &nbsp; <kbd>우클릭 드래그</kbd> 시점 &nbsp;│&nbsp; <kbd>V</kbd> 선택 &nbsp; <kbd>G</kbd> 이동 &nbsp; <kbd>R</kbd> 회전 &nbsp; <kbd>F</kbd> 크기 &nbsp; <kbd>Del</kbd> 삭제
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+// ─── PDF.js Setup ───
+const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+// ═══════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════
+const state = {
+  objects: [],
+  structures: [],   // venue structural elements (walls, floors, etc.)
+  selectedObject: null,
+  selectedType: null,
+  currentTool: 'select',
+  floorplanTexture: null,
+  floorplanMesh: null,
+  nextId: 1,
+  gridSnap: 0.5,
+};
+
+// Object type definitions
+const OBJECT_DEFS = {
+  stage:   { name: '무대 단상', color: 0x5b8c6e, w: 12, h: 1.2, d: 8, shape: 'box' },
+  speaker: { name: '스피커', color: 0x2d3748, w: 1.2, h: 2.4, d: 0.8, shape: 'box' },
+  truss:   { name: '트러스', color: 0x9ca3af, w: 12, h: 0.3, d: 0.3, shape: 'box' },
+  led:     { name: 'LED 스크린', color: 0x3b6ce8, w: 8, h: 4.5, d: 0.15, shape: 'box' },
+  light:   { name: '조명 기구', color: 0xe8a820, w: 0.3, h: 0.4, d: 0.3, shape: 'cylinder' },
+  riser:   { name: '라이저', color: 0x9e7b5a, w: 2, h: 0.6, d: 2, shape: 'box' },
+  monitor: { name: '모니터 SP', color: 0x4a5568, w: 0.5, h: 0.4, d: 0.4, shape: 'box' },
+  barrier: { name: '바리케이드', color: 0xd97706, w: 2, h: 1.1, d: 0.15, shape: 'box' },
+};
+
+// ═══════════════════════════════════════════
+//  VENUE PRESETS (구조물 치수 데이터)
+// ═══════════════════════════════════════════
+// Coordinate system: Stage front-center = (0, 0, 0)
+// +X = Stage Right (관객 왼쪽), -X = Stage Left
+// +Z = 관객석 방향 (Downstage), -Z = 백스테이지 방향 (Upstage)
+// Y = 높이
+
+const VENUE_PRESETS = {
+  yes24: {
+    name: 'YES24 LIVE HALL',
+    description: '서울 광진구 · 스탠딩 2,000석',
+    floorplanScale: { w: 44, d: 52 },
+    structures: [
+      // ── 무대 (Stage) ──
+      { name: '메인 무대',     cat: 'stage',  x: 0,    y: 0.6,  z: -4,    w: 14,   h: 1.2,  d: 8,    opacity: 0.92 },
+      { name: '무대 앞 확장',  cat: 'stage',  x: 0,    y: 0.45, z: 0.8,   w: 16,   h: 0.9,  d: 1.2,  opacity: 0.88 },
+
+      // ── 백스테이지 (Backstage) ──
+      { name: '백스테이지',    cat: 'back',   x: 0,    y: 0.05, z: -12,   w: 20,   h: 0.1,  d: 8,    opacity: 0.7 },
+
+      // ── 객석 (Audience) ──
+      { name: '1F 객석',       cat: 'audience', x: 0,    y: 0.02, z: 9,     w: 20,   h: 0.04, d: 14,   opacity: 0.55 },
+      { name: '2F 발코니',     cat: 'audience', x: 0,    y: 3.5,  z: 18,    w: 16,   h: 0.25, d: 6,    opacity: 0.75 },
+      { name: '2F 발코니 난간', cat: 'audience', x: 0,    y: 4.1,  z: 14.85, w: 16,   h: 1,    d: 0.15, opacity: 0.8 },
+
+      // ── 벽체 (Walls) ── height=10m
+      { name: '후면 벽',       cat: 'wall',   x: 0,    y: 5,    z: -16.15, w: 22,  h: 10,   d: 0.3,  opacity: 0.55 },
+      { name: '좌측 벽',       cat: 'wall',   x: -11.15, y: 5,  z: 3,      w: 0.3, h: 10,   d: 38,   opacity: 0.45 },
+      { name: '우측 벽',       cat: 'wall',   x: 11.15, y: 5,   z: 3,      w: 0.3, h: 10,   d: 38,   opacity: 0.45 },
+      { name: '전면 벽 (좌)',  cat: 'wall',   x: -6.5, y: 5,    z: 22.15,  w: 9,   h: 10,   d: 0.3,  opacity: 0.45 },
+      { name: '전면 벽 (우)',  cat: 'wall',   x: 6.5,  y: 5,    z: 22.15,  w: 9,   h: 10,   d: 0.3,  opacity: 0.45 },
+
+      // ── 프로시니엄 아치 (Proscenium) ──
+      { name: '프로시니엄 좌', cat: 'proscenium', x: -7.8, y: 5,  z: -0.3,  w: 1.2,  h: 10,  d: 0.6, opacity: 0.85 },
+      { name: '프로시니엄 우', cat: 'proscenium', x: 7.8,  y: 5,  z: -0.3,  w: 1.2,  h: 10,  d: 0.6, opacity: 0.85 },
+      { name: '프로시니엄 상단', cat: 'proscenium', x: 0,   y: 9.5, z: -0.3, w: 16.8, h: 1,   d: 0.6, opacity: 0.85 },
+
+      // ── 날개 무대 벽 (Wing Walls) ──
+      { name: '상수 날개벽',   cat: 'wall',   x: -8.5,  y: 5,   z: -8,    w: 0.25, h: 10,   d: 16,  opacity: 0.4 },
+      { name: '하수 날개벽',   cat: 'wall',   x: 8.5,   y: 5,   z: -8,    w: 0.25, h: 10,   d: 16,  opacity: 0.4 },
+
+      // ── FOH (음향/조명 콘솔) ──
+      { name: 'FOH 콘솔 부스', cat: 'tech',   x: 0,    y: 0.5,  z: 14,    w: 5,    h: 1,    d: 2,   opacity: 0.9 },
+
+      // ── 기둥 (Pillars) ──
+      { name: '좌측 기둥 1',   cat: 'pillar', x: -9.5, y: 5,    z: 4,     w: 0.6,  h: 10,   d: 0.6, opacity: 0.85 },
+      { name: '좌측 기둥 2',   cat: 'pillar', x: -9.5, y: 5,    z: 12,    w: 0.6,  h: 10,   d: 0.6, opacity: 0.85 },
+      { name: '우측 기둥 1',   cat: 'pillar', x: 9.5,  y: 5,    z: 4,     w: 0.6,  h: 10,   d: 0.6, opacity: 0.85 },
+      { name: '우측 기둥 2',   cat: 'pillar', x: 9.5,  y: 5,    z: 12,    w: 0.6,  h: 10,   d: 0.6, opacity: 0.85 },
+
+      // ── 천장 트러스 레일 (Ceiling Grid) ──
+      { name: '천장 트러스 (가로 1)', cat: 'ceiling', x: 0,   y: 9.8,  z: -2,  w: 15, h: 0.2, d: 0.2, opacity: 0.8 },
+      { name: '천장 트러스 (가로 2)', cat: 'ceiling', x: 0,   y: 9.8,  z: 2,   w: 15, h: 0.2, d: 0.2, opacity: 0.8 },
+      { name: '천장 트러스 (가로 3)', cat: 'ceiling', x: 0,   y: 9.8,  z: 6,   w: 15, h: 0.2, d: 0.2, opacity: 0.8 },
+      { name: '천장 트러스 (세로 좌)', cat: 'ceiling', x: -5,  y: 9.8,  z: 2,   w: 0.2, h: 0.2, d: 12, opacity: 0.8 },
+      { name: '천장 트러스 (세로 우)', cat: 'ceiling', x: 5,   y: 9.8,  z: 2,   w: 0.2, h: 0.2, d: 12, opacity: 0.8 },
+    ]
+  }
+};
+
+// ═══════════════════════════════════════════
+//  THREE.JS SETUP
+// ═══════════════════════════════════════════
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe8ecf1);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+camera.position.set(25, 30, 35);
+
+// Orbit Controls
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.08;
+orbitControls.maxPolarAngle = Math.PI * 0.95;
+orbitControls.minDistance = 3;
+orbitControls.maxDistance = 150;
+orbitControls.target.set(0, 0, 0);
+// Left = orbit rotate, Middle = pan, Right = disabled (we handle it for FPS look)
+orbitControls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: null,
+};
+orbitControls.enablePan = true;
+
+// Transform Controls
+const transformControls = new TransformControls(camera, renderer.domElement);
+transformControls.setSize(0.8);
+transformControls.addEventListener('dragging-changed', (e) => {
+  orbitControls.enabled = !e.value;
+});
+transformControls.addEventListener('objectChange', () => {
+  if (state.selectedObject) {
+    updateProperties();
+    updateObjectList();
+  }
+});
+scene.add(transformControls);
+
+// ─── LIGHTS (SketchUp-like bright, even illumination) ───
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(25, 50, 30);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.left = -50;
+dirLight.shadow.camera.right = 50;
+dirLight.shadow.camera.top = 50;
+dirLight.shadow.camera.bottom = -50;
+scene.add(dirLight);
+
+const dirLight2 = new THREE.DirectionalLight(0xddeeff, 0.4);
+dirLight2.position.set(-20, 30, -15);
+scene.add(dirLight2);
+
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x8899aa, 0.5);
+scene.add(hemiLight);
+
+// ─── GROUND ───
+const groundSize = 80;
+const groundGeo = new THREE.PlaneGeometry(groundSize, groundSize);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0xd5dbe3,
+  roughness: 0.95,
+  metalness: 0.0,
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.01;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ─── GRID (SketchUp-like subtle lines) ───
+const gridHelper = new THREE.GridHelper(groundSize, groundSize, 0xaab0bb, 0xc8cdd5);
+gridHelper.position.y = 0.005;
+scene.add(gridHelper);
+
+const majorGrid = new THREE.GridHelper(groundSize, groundSize / 5, 0x8890a0, 0x8890a0);
+majorGrid.position.y = 0.006;
+scene.add(majorGrid);
+
+// ─── AXIS INDICATOR ───
+const axesLength = 3;
+const axesHelper = new THREE.AxesHelper(axesLength);
+axesHelper.position.set(-groundSize/2 + 1, 0.01, groundSize/2 - 1);
+scene.add(axesHelper);
+
+// ─── FLOORPLAN MESH ───
+const floorplanGeo = new THREE.PlaneGeometry(1, 1);
+const floorplanMat = new THREE.MeshBasicMaterial({
+  transparent: true,
+  opacity: 0.85,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const floorplanMesh = new THREE.Mesh(floorplanGeo, floorplanMat);
+floorplanMesh.rotation.x = -Math.PI / 2;
+floorplanMesh.position.y = 0.02;
+floorplanMesh.visible = false;
+scene.add(floorplanMesh);
+state.floorplanMesh = floorplanMesh;
+
+// ─── RAYCASTER ───
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const intersectPoint = new THREE.Vector3();
+
+// ─── SELECTION HIGHLIGHT ───
+const outlineMaterial = new THREE.MeshBasicMaterial({
+  color: 0xff6b35,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.4,
+});
+
+// ═══════════════════════════════════════════
+//  FLOORPLAN UPLOAD
+// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  FLOORPLAN UPLOAD (Image + PDF)
+// ═══════════════════════════════════════════
+let currentPdfDoc = null;  // stored for page navigation
+
+document.getElementById('floorplan-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    await handlePdfUpload(file);
+  } else {
+    handleImageUpload(file);
+  }
+});
+
+function handleImageUpload(file) {
+  document.getElementById('pdf-page-control').style.display = 'none';
+  currentPdfDoc = null;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      applyFloorplanImage(img, ev.target.result);
+      showToast('도면이 매핑되었습니다');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handlePdfUpload(file) {
+  try {
+    showToast('PDF 로딩 중...');
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    currentPdfDoc = pdf;
+
+    // Show page controls
+    const pageControl = document.getElementById('pdf-page-control');
+    pageControl.style.display = 'block';
+    document.getElementById('pdf-page-num').value = 1;
+    document.getElementById('pdf-page-num').max = pdf.numPages;
+    document.getElementById('pdf-page-total').textContent = `/ ${pdf.numPages}`;
+
+    await renderPdfPage(1);
+  } catch (err) {
+    console.error('PDF load error:', err);
+    showToast('PDF 로딩 실패 — 이미지로 다시 시도해주세요');
+  }
+}
+
+async function renderPdfPage(pageNum) {
+  if (!currentPdfDoc) return;
+  pageNum = Math.max(1, Math.min(pageNum, currentPdfDoc.numPages));
+
+  const page = await currentPdfDoc.getPage(pageNum);
+  const scale = 3;  // high-res render for texture clarity
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+
+  // White background (PDFs can have transparent bg)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const img = new Image();
+  img.onload = () => applyFloorplanImage(img, dataUrl);
+  img.src = dataUrl;
+
+  showToast(`PDF 페이지 ${pageNum}/${currentPdfDoc.numPages} 매핑 완료`);
+}
+
+function applyFloorplanImage(img, previewSrc) {
+  const texture = new THREE.Texture(img);
+  texture.needsUpdate = true;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  floorplanMat.map = texture;
+  floorplanMat.needsUpdate = true;
+
+  const w = parseFloat(document.getElementById('scale-width').value) || 44;
+  const d = parseFloat(document.getElementById('scale-depth').value) || 52;
+  floorplanMesh.scale.set(w, d, 1);
+  floorplanMesh.visible = true;
+
+  // Update upload area preview
+  const area = document.getElementById('upload-area');
+  area.classList.add('has-image');
+  area.innerHTML = `<img src="${previewSrc}" alt="floorplan">`;
+
+  state.floorplanTexture = texture;
+}
+
+// PDF page navigation
+document.getElementById('pdf-page-num').addEventListener('change', (e) => {
+  const pageNum = parseInt(e.target.value);
+  if (currentPdfDoc && pageNum >= 1 && pageNum <= currentPdfDoc.numPages) {
+    renderPdfPage(pageNum);
+  }
+});
+
+// Scale input changes
+document.getElementById('scale-width').addEventListener('input', updateFloorplanScale);
+document.getElementById('scale-depth').addEventListener('input', updateFloorplanScale);
+document.getElementById('floorplan-opacity').addEventListener('input', (e) => {
+  floorplanMat.opacity = parseFloat(e.target.value);
+});
+
+function updateFloorplanScale() {
+  if (!floorplanMesh.visible) return;
+  const w = parseFloat(document.getElementById('scale-width').value) || 44;
+  const d = parseFloat(document.getElementById('scale-depth').value) || 52;
+  floorplanMesh.scale.set(w, d, 1);
+}
+
+// ═══════════════════════════════════════════
+//  VENUE STRUCTURE CREATION
+// ═══════════════════════════════════════════
+// SketchUp-style category colors: bright, distinct, easy to identify
+const CAT_COLORS = {
+  stage:      { face: 0x5b8c6e, edge: 0x2d5a3a },  // 초록 (무대)
+  back:       { face: 0x8c7b6b, edge: 0x5a4d3e },  // 갈색 (백스테이지)
+  audience:   { face: 0x7ba3c9, edge: 0x3d6a8f },  // 파랑 (객석)
+  wall:       { face: 0xc8bfb0, edge: 0x6b6560 },  // 베이지 (벽)
+  proscenium: { face: 0xd4a853, edge: 0x8a6d2a },  // 골드 (프로시니엄)
+  tech:       { face: 0x5b8bbf, edge: 0x2c5680 },  // 진파랑 (기술)
+  pillar:     { face: 0xa09890, edge: 0x5e5550 },  // 회색 (기둥)
+  ceiling:    { face: 0x7e7e8e, edge: 0x3e3e4e },  // 회보라 (천장)
+};
+
+function createStructuralBlock(def) {
+  const geometry = new THREE.BoxGeometry(def.w, def.h, def.d);
+  const catColor = CAT_COLORS[def.cat] || { face: 0xaaaaaa, edge: 0x444444 };
+
+  const material = new THREE.MeshStandardMaterial({
+    color: catColor.face,
+    roughness: 0.85,
+    metalness: 0.02,
+    transparent: true,
+    opacity: def.opacity || 0.8,
+    side: THREE.DoubleSide,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(def.x, def.y, def.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // SketchUp-style bold dark edges
+  const edges = new THREE.EdgesGeometry(geometry);
+  const lineMat = new THREE.LineBasicMaterial({
+    color: catColor.edge,
+    transparent: true,
+    opacity: 0.85,
+    linewidth: 1,
+  });
+  const wireframe = new THREE.LineSegments(edges, lineMat);
+  mesh.add(wireframe);
+
+  // Structure label
+  const label = createStructureLabel(def.name, catColor.face);
+  label.position.y = def.h / 2 + 0.5;
+  mesh.add(label);
+
+  mesh.userData = {
+    isStructure: true,
+    name: def.name,
+    cat: def.cat,
+    w: def.w, h: def.h, d: def.d,
+    label: label,
+    edgeColor: catColor.edge,
+  };
+
+  scene.add(mesh);
+  state.structures.push(mesh);
+  return mesh;
+}
+
+function createStructureLabel(text, accentColor) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 256;
+  canvas.height = 48;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.roundRect(0, 0, 256, 48, 6);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1;
+  ctx.roundRect(0, 0, 256, 48, 6);
+  ctx.stroke();
+
+  // Accent line at top
+  const hex = '#' + accentColor.toString(16).padStart(6, '0');
+  ctx.fillStyle = hex;
+  ctx.fillRect(8, 4, 30, 3);
+
+  ctx.font = '600 18px "Noto Sans KR", sans-serif';
+  ctx.fillStyle = '#333340';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 28);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    opacity: 0.8,
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(2.5, 0.5, 1);
+  return sprite;
+}
+
+window.loadVenuePreset = function(presetId) {
+  const preset = VENUE_PRESETS[presetId];
+  if (!preset) return;
+
+  // Clear existing structures
+  clearStructures();
+
+  // Update floorplan scale inputs
+  document.getElementById('scale-width').value = preset.floorplanScale.w;
+  document.getElementById('scale-depth').value = preset.floorplanScale.d;
+  updateFloorplanScale();
+
+  // Create all structural elements
+  preset.structures.forEach(s => createStructuralBlock(s));
+
+  // Move camera to a nice overview position
+  camera.position.set(25, 25, 30);
+  orbitControls.target.set(0, 2, 4);
+  orbitControls.update();
+
+  updateObjectList();
+  updateObjectCount();
+  showToast(`${preset.name} 공연장 구조물 로드 완료 (${preset.structures.length}개)`);
+};
+
+window.clearStructures = function() {
+  state.structures.forEach(mesh => {
+    scene.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+  });
+  state.structures = [];
+  updateObjectList();
+  updateObjectCount();
+};
+
+// Structure opacity slider
+document.getElementById('structure-opacity').addEventListener('input', (e) => {
+  const baseOpacity = parseFloat(e.target.value);
+  state.structures.forEach(mesh => {
+    // Scale each structure's opacity relative to its original
+    const origOpacity = mesh.userData.origOpacity || mesh.material.opacity;
+    if (!mesh.userData.origOpacity) mesh.userData.origOpacity = origOpacity;
+    mesh.material.opacity = origOpacity * baseOpacity / 0.7;
+  });
+});
+
+
+// ═══════════════════════════════════════════
+//  OBJECT CREATION & MANAGEMENT
+// ═══════════════════════════════════════════
+window.selectObjectType = function(type) {
+  // Toggle selection
+  if (state.selectedType === type) {
+    state.selectedType = null;
+    document.querySelectorAll('.object-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('status-mode').textContent = '선택 모드';
+    return;
+  }
+
+  state.selectedType = type;
+  document.querySelectorAll('.object-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.type === type);
+  });
+
+  deselectObject();
+  const def = OBJECT_DEFS[type];
+  document.getElementById('status-mode').textContent = `배치 모드: ${def.name}`;
+  showToast(`${def.name} — 바닥을 클릭하여 배치하세요`);
+};
+
+function createObject(type, position) {
+  const def = OBJECT_DEFS[type];
+  let geometry, mesh;
+
+  if (def.shape === 'cylinder') {
+    geometry = new THREE.CylinderGeometry(def.w / 2, def.w / 2, def.h, 16);
+  } else {
+    geometry = new THREE.BoxGeometry(def.w, def.h, def.d);
+  }
+
+  const material = new THREE.MeshStandardMaterial({
+    color: def.color,
+    roughness: 0.6,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.92,
+  });
+
+  mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // Position: snap to grid, y centered on ground
+  const snappedX = Math.round(position.x / state.gridSnap) * state.gridSnap;
+  const snappedZ = Math.round(position.z / state.gridSnap) * state.gridSnap;
+  mesh.position.set(snappedX, def.h / 2, snappedZ);
+
+  // SketchUp-style bold dark edges
+  const edges = new THREE.EdgesGeometry(geometry);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.7 });
+  const wireframe = new THREE.LineSegments(edges, lineMat);
+  mesh.add(wireframe);
+
+  // Label sprite
+  const label = createLabel(`${def.name} #${state.nextId}`);
+  label.position.y = def.h / 2 + 0.8;
+  mesh.add(label);
+
+  // Store metadata
+  mesh.userData = {
+    id: state.nextId++,
+    type: type,
+    name: `${def.name}`,
+    def: { ...def },
+    label: label,
+  };
+
+  scene.add(mesh);
+  state.objects.push(mesh);
+
+  updateObjectList();
+  updateObjectCount();
+  return mesh;
+}
+
+function createLabel(text) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 256;
+  canvas.height = 64;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.roundRect(0, 0, 256, 64, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,107,53,0.6)';
+  ctx.lineWidth = 2;
+  ctx.roundRect(0, 0, 256, 64, 8);
+  ctx.stroke();
+
+  ctx.font = '600 24px "Noto Sans KR", sans-serif';
+  ctx.fillStyle = '#333340';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 32);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(3, 0.75, 1);
+  return sprite;
+}
+
+function deleteSelectedObject() {
+  if (!state.selectedObject) return;
+  transformControls.detach();
+
+  const idx = state.objects.indexOf(state.selectedObject);
+  if (idx >= 0) state.objects.splice(idx, 1);
+
+  scene.remove(state.selectedObject);
+  state.selectedObject.geometry.dispose();
+  state.selectedObject.material.dispose();
+
+  state.selectedObject = null;
+  updateObjectList();
+  updateProperties();
+  updateObjectCount();
+}
+
+// ═══════════════════════════════════════════
+//  SELECTION
+// ═══════════════════════════════════════════
+function selectObject(mesh) {
+  deselectObject();
+  state.selectedObject = mesh;
+  mesh.material.emissive = new THREE.Color(0xff6b35);
+  mesh.material.emissiveIntensity = 0.3;
+
+  if (state.currentTool === 'move') transformControls.setMode('translate');
+  else if (state.currentTool === 'rotate') transformControls.setMode('rotate');
+  else if (state.currentTool === 'scale') transformControls.setMode('scale');
+
+  if (state.currentTool !== 'select') {
+    transformControls.attach(mesh);
+  }
+
+  updateProperties();
+  updateObjectList();
+
+  document.getElementById('right-panel').classList.add('visible');
+}
+
+function deselectObject() {
+  if (state.selectedObject) {
+    state.selectedObject.material.emissive = new THREE.Color(0x000000);
+    state.selectedObject.material.emissiveIntensity = 0;
+  }
+  state.selectedObject = null;
+  transformControls.detach();
+  updateProperties();
+  updateObjectList();
+  document.getElementById('right-panel').classList.remove('visible');
+}
+
+// ═══════════════════════════════════════════
+//  TOOLS
+// ═══════════════════════════════════════════
+window.setTool = function(tool) {
+  state.currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tool-${tool}`).classList.add('active');
+
+  const modeNames = { select: '선택 모드', move: '이동 모드', rotate: '회전 모드', scale: '크기 모드' };
+  document.getElementById('status-mode').textContent = state.selectedType
+    ? `배치 모드: ${OBJECT_DEFS[state.selectedType].name}`
+    : modeNames[tool];
+
+  if (state.selectedObject) {
+    if (tool === 'move') { transformControls.setMode('translate'); transformControls.attach(state.selectedObject); }
+    else if (tool === 'rotate') { transformControls.setMode('rotate'); transformControls.attach(state.selectedObject); }
+    else if (tool === 'scale') { transformControls.setMode('scale'); transformControls.attach(state.selectedObject); }
+    else { transformControls.detach(); }
+  }
+};
+
+// ═══════════════════════════════════════════
+//  CAMERA VIEWS
+// ═══════════════════════════════════════════
+window.setCameraView = function(view) {
+  document.querySelectorAll('.header-controls .view-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const target = orbitControls.target.clone();
+  const duration = 600;
+  const startPos = camera.position.clone();
+  const startTime = performance.now();
+
+  let endPos;
+  switch (view) {
+    case 'top':
+      endPos = new THREE.Vector3(target.x, 50, target.z + 0.01);
+      break;
+    case 'front':
+      endPos = new THREE.Vector3(target.x, 8, target.z + 40);
+      break;
+    case 'side':
+      endPos = new THREE.Vector3(target.x + 40, 8, target.z);
+      break;
+    default:
+      endPos = new THREE.Vector3(25, 30, 35);
+  }
+
+  function animateCamera(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    camera.position.lerpVectors(startPos, endPos, ease);
+    orbitControls.update();
+    if (t < 1) requestAnimationFrame(animateCamera);
+  }
+  requestAnimationFrame(animateCamera);
+};
+
+// ═══════════════════════════════════════════
+//  MOUSE EVENTS
+// ═══════════════════════════════════════════
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ─── FPS Look State ───
+const fpsLook = {
+  active: false,
+  prevX: 0,
+  prevY: 0,
+  sensitivity: 0.003,
+};
+
+function getCanvasMousePos(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function onPointerDown(e) {
+  // Right-click → start FPS look
+  if (e.button === 2) {
+    fpsLook.active = true;
+    fpsLook.prevX = e.clientX;
+    fpsLook.prevY = e.clientY;
+    renderer.domElement.style.cursor = 'crosshair';
+    orbitControls.enabled = false;
+    return;
+  }
+
+  // Left-click → selection / placement
+  if (e.button !== 0) return;
+  if (transformControls.dragging) return;
+
+  getCanvasMousePos(e);
+  raycaster.setFromCamera(mouse, camera);
+
+  // If placing object
+  if (state.selectedType) {
+    const ray = raycaster.ray;
+    if (ray.intersectPlane(floorPlane, intersectPoint)) {
+      const mesh = createObject(state.selectedType, intersectPoint);
+      selectObject(mesh);
+    }
+    return;
+  }
+
+  // Try selecting existing objects
+  const meshes = state.objects.filter(o => o !== state.selectedObject);
+  if (state.selectedObject) meshes.push(state.selectedObject);
+
+  const intersects = raycaster.intersectObjects(meshes, false);
+  if (intersects.length > 0) {
+    selectObject(intersects[0].object);
+  } else {
+    deselectObject();
+  }
+}
+
+function onPointerMove(e) {
+  // FPS look rotation
+  if (fpsLook.active) {
+    const dx = e.clientX - fpsLook.prevX;
+    const dy = e.clientY - fpsLook.prevY;
+    fpsLook.prevX = e.clientX;
+    fpsLook.prevY = e.clientY;
+
+    // Calculate current offset from camera to target
+    const offset = new THREE.Vector3().subVectors(orbitControls.target, camera.position);
+    const distance = offset.length();
+
+    // Spherical coordinates
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta -= dx * fpsLook.sensitivity;   // yaw
+    spherical.phi -= dy * fpsLook.sensitivity;      // pitch
+    // Clamp pitch to avoid flipping
+    spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi));
+
+    // Apply new target position relative to camera
+    offset.setFromSpherical(spherical);
+    orbitControls.target.copy(camera.position).add(offset);
+    return;
+  }
+
+  // Regular hover: update cursor position
+  getCanvasMousePos(e);
+  raycaster.setFromCamera(mouse, camera);
+  const ray = raycaster.ray;
+  if (ray.intersectPlane(floorPlane, intersectPoint)) {
+    document.getElementById('status-cursor').textContent =
+      `X: ${intersectPoint.x.toFixed(1)} Z: ${intersectPoint.z.toFixed(1)}`;
+  }
+}
+
+function onPointerUp(e) {
+  if (e.button === 2 && fpsLook.active) {
+    fpsLook.active = false;
+    renderer.domElement.style.cursor = '';
+    orbitControls.enabled = true;
+  }
+}
+
+// Safety: release FPS look if pointer leaves window
+document.addEventListener('pointerup', (e) => {
+  if (e.button === 2 && fpsLook.active) {
+    fpsLook.active = false;
+    renderer.domElement.style.cursor = '';
+    orbitControls.enabled = true;
+  }
+});
+
+// ═══════════════════════════════════════════
+//  WASD / ARROW KEY CAMERA MOVEMENT
+// ═══════════════════════════════════════════
+const moveState = {
+  forward: false, backward: false, left: false, right: false,
+  up: false, down: false, sprint: false,
+};
+const MOVE_SPEED = 18;       // m/s at normal speed
+const SPRINT_MULTIPLIER = 2.5;
+
+// Map of keys to movement directions
+const MOVE_KEYS = {
+  'w': 'forward', 'arrowup': 'forward',
+  's': 'backward', 'arrowdown': 'backward',
+  'a': 'left', 'arrowleft': 'left',
+  'd': 'right', 'arrowright': 'right',
+  'q': 'down', 'e': 'up',
+  'shift': 'sprint',
+};
+
+// ═══════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  const key = e.key.toLowerCase();
+
+  // Movement keys (WASD / Arrows / QE / Shift)
+  if (key in MOVE_KEYS) {
+    const dir = MOVE_KEYS[key];
+    if (dir === 'sprint') { moveState.sprint = true; }
+    else { moveState[dir] = true; }
+    e.preventDefault();
+    return;
+  }
+
+  // Tool shortcuts (remapped: S→F to avoid WASD conflict)
+  // Ctrl+V → paste cue at current time
+  if (key === 'v' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    pasteCue();
+    return;
+  }
+
+  switch (key) {
+    case ' ':
+      e.preventDefault();
+      tlPlayPause();
+      break;
+    case '[':
+      e.preventDefault();
+      tlSkip(-5);
+      break;
+    case ']':
+      e.preventDefault();
+      tlSkip(5);
+      break;
+    case ',':
+      e.preventDefault();
+      tlSkip(-1);
+      break;
+    case '.':
+      e.preventDefault();
+      tlSkip(1);
+      break;
+    case 'home':
+      e.preventDefault();
+      tlStop();
+      break;
+    case 'l':
+      tlToggleLoop();
+      break;
+    case 'm':
+      tlToggleMute();
+      break;
+    case 'v': setTool('select'); break;
+    case 'g': setTool('move'); break;
+    case 'r': setTool('rotate'); break;
+    case 'f': setTool('scale'); break;
+    case 'delete':
+    case 'backspace':
+      deleteSelectedObject();
+      break;
+    case 'escape':
+      if (state.selectedType) {
+        state.selectedType = null;
+        document.querySelectorAll('.object-item').forEach(el => el.classList.remove('active'));
+        document.getElementById('status-mode').textContent = '선택 모드';
+      } else {
+        deselectObject();
+      }
+      break;
+    case 'c':
+      if (e.ctrlKey || e.metaKey) break;
+      duplicateSelected();
+      break;
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if (key in MOVE_KEYS) {
+    const dir = MOVE_KEYS[key];
+    if (dir === 'sprint') { moveState.sprint = false; }
+    else { moveState[dir] = false; }
+  }
+});
+
+// Reset all movement on window blur (prevents stuck keys)
+window.addEventListener('blur', () => {
+  moveState.forward = moveState.backward = moveState.left = moveState.right =
+  moveState.up = moveState.down = moveState.sprint = false;
+  if (fpsLook.active) {
+    fpsLook.active = false;
+    renderer.domElement.style.cursor = '';
+    orbitControls.enabled = true;
+  }
+});
+
+function duplicateSelected() {
+  if (!state.selectedObject) return;
+  const src = state.selectedObject;
+  const pos = src.position.clone();
+  pos.x += 2;
+  pos.z += 2;
+  const newMesh = createObject(src.userData.type, pos);
+  newMesh.position.y = src.position.y;
+  newMesh.rotation.copy(src.rotation);
+  newMesh.scale.copy(src.scale);
+  selectObject(newMesh);
+  showToast('오브젝트 복제됨');
+}
+
+// ═══════════════════════════════════════════
+//  UI UPDATES
+// ═══════════════════════════════════════════
+function updateObjectList() {
+  const listEl = document.getElementById('object-list');
+  const hasStructures = state.structures.length > 0;
+  const hasObjects = state.objects.length > 0;
+
+  if (!hasStructures && !hasObjects) {
+    listEl.innerHTML = '<p style="font-size:11px;color:var(--text-muted);text-align:center;padding:8px;">배치된 오브젝트 없음</p>';
+    return;
+  }
+
+  let html = '';
+
+  // Structures section
+  if (hasStructures) {
+    html += `<div style="font-size:9px;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;padding:4px 8px;font-family:'JetBrains Mono',monospace;">구조물 (${state.structures.length})</div>`;
+    html += state.structures.map((obj, idx) => {
+      const ud = obj.userData;
+      const hex = '#' + (ud.edgeColor || 0x888888).toString(16).padStart(6, '0');
+      return `
+        <div class="obj-list-item" style="opacity:0.7;padding:3px 8px;">
+          <div class="dot" style="background:${hex}"></div>
+          <span class="label" style="font-size:10px;">${ud.name}</span>
+          <span class="type">${ud.cat}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // User objects section
+  if (hasObjects) {
+    if (hasStructures) {
+      html += `<div style="font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;padding:6px 8px 4px;font-family:'JetBrains Mono',monospace;border-top:1px solid var(--border);margin-top:4px;">장비 (${state.objects.length})</div>`;
+    }
+    html += state.objects.map(obj => {
+      const ud = obj.userData;
+      const def = OBJECT_DEFS[ud.type];
+      const selected = obj === state.selectedObject;
+      return `
+        <div class="obj-list-item ${selected ? 'selected' : ''}" data-id="${ud.id}" onclick="selectObjectById(${ud.id})">
+          <div class="dot" style="background:#${def.color.toString(16).padStart(6, '0')}"></div>
+          <span class="label">${ud.name} #${ud.id}</span>
+          <span class="type">${ud.type}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  listEl.innerHTML = html;
+}
+
+window.selectObjectById = function(id) {
+  const mesh = state.objects.find(o => o.userData.id === id);
+  if (mesh) selectObject(mesh);
+};
+
+function updateProperties() {
+  const panel = document.getElementById('props-content');
+  if (!state.selectedObject) {
+    panel.innerHTML = '<p style="font-size:11px;color:var(--text-muted);">오브젝트를 선택하세요</p>';
+    document.getElementById('right-panel').classList.remove('visible');
+    return;
+  }
+
+  const obj = state.selectedObject;
+  const ud = obj.userData;
+  const p = obj.position;
+  const r = obj.rotation;
+  const s = obj.scale;
+
+  panel.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <div class="prop-row">
+        <label style="min-width:40px;">이름</label>
+        <input type="text" value="${ud.name} #${ud.id}" onchange="renameObject(this.value)" style="flex:1;">
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${ud.type.toUpperCase()}</div>
+    </div>
+    <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:10px 0 6px;font-family:'JetBrains Mono',monospace;">위치 (m)</h3>
+    <div class="prop-row">
+      <label style="color:var(--red);">X</label>
+      <input type="number" step="0.1" value="${p.x.toFixed(2)}" onchange="setProp('px',this.value)">
+    </div>
+    <div class="prop-row">
+      <label style="color:var(--green);">Y</label>
+      <input type="number" step="0.1" value="${p.y.toFixed(2)}" onchange="setProp('py',this.value)">
+    </div>
+    <div class="prop-row">
+      <label style="color:var(--blue);">Z</label>
+      <input type="number" step="0.1" value="${p.z.toFixed(2)}" onchange="setProp('pz',this.value)">
+    </div>
+    <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:10px 0 6px;font-family:'JetBrains Mono',monospace;">회전 (°)</h3>
+    <div class="prop-row">
+      <label>Y</label>
+      <input type="number" step="5" value="${THREE.MathUtils.radToDeg(r.y).toFixed(1)}" onchange="setProp('ry',this.value)">
+    </div>
+    <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:10px 0 6px;font-family:'JetBrains Mono',monospace;">크기 배율</h3>
+    <div class="prop-row">
+      <label>X</label>
+      <input type="number" step="0.1" min="0.1" value="${s.x.toFixed(2)}" onchange="setProp('sx',this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Y</label>
+      <input type="number" step="0.1" min="0.1" value="${s.y.toFixed(2)}" onchange="setProp('sy',this.value)">
+    </div>
+    <div class="prop-row">
+      <label>Z</label>
+      <input type="number" step="0.1" min="0.1" value="${s.z.toFixed(2)}" onchange="setProp('sz',this.value)">
+    </div>
+    <button class="btn-delete" onclick="deleteSelectedObject()">🗑️ 삭제</button>
+  `;
+}
+
+window.setProp = function(prop, val) {
+  if (!state.selectedObject) return;
+  const v = parseFloat(val);
+  const obj = state.selectedObject;
+  switch (prop) {
+    case 'px': obj.position.x = v; break;
+    case 'py': obj.position.y = v; break;
+    case 'pz': obj.position.z = v; break;
+    case 'ry': obj.rotation.y = THREE.MathUtils.degToRad(v); break;
+    case 'sx': obj.scale.x = v; break;
+    case 'sy': obj.scale.y = v; break;
+    case 'sz': obj.scale.z = v; break;
+  }
+};
+
+window.renameObject = function(name) {
+  if (!state.selectedObject) return;
+  state.selectedObject.userData.name = name;
+  updateObjectList();
+};
+
+window.deleteSelectedObject = deleteSelectedObject;
+
+function updateObjectCount() {
+  const total = state.objects.length + state.structures.length;
+  document.getElementById('status-objects').textContent = `오브젝트: ${state.objects.length} · 구조물: ${state.structures.length}`;
+}
+
+// Toast
+function showToast(msg) {
+  const toast = document.getElementById('help-toast');
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  RESIZE
+// ═══════════════════════════════════════════
+function resize() {
+  const rect = container.getBoundingClientRect();
+  camera.aspect = rect.width / rect.height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(rect.width, rect.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ═══════════════════════════════════════════
+//  ANIMATION LOOP
+// ═══════════════════════════════════════════
+const clock = new THREE.Clock();
+const _moveDir = new THREE.Vector3();
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05); // cap to avoid jumps
+
+  // ── WASD camera movement ──
+  const isMoving = moveState.forward || moveState.backward ||
+                   moveState.left || moveState.right ||
+                   moveState.up || moveState.down;
+
+  if (isMoving) {
+    const speed = MOVE_SPEED * (moveState.sprint ? SPRINT_MULTIPLIER : 1) * delta;
+
+    // Camera forward direction (projected onto XZ plane)
+    camera.getWorldDirection(_forward);
+    _forward.y = 0;
+    _forward.normalize();
+
+    // Camera right direction
+    _right.crossVectors(_forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    _moveDir.set(0, 0, 0);
+    if (moveState.forward)  _moveDir.add(_forward);
+    if (moveState.backward) _moveDir.sub(_forward);
+    if (moveState.right)    _moveDir.add(_right);
+    if (moveState.left)     _moveDir.sub(_right);
+    if (moveState.up)       _moveDir.y += 1;
+    if (moveState.down)     _moveDir.y -= 1;
+
+    if (_moveDir.lengthSq() > 0) {
+      _moveDir.normalize().multiplyScalar(speed);
+      camera.position.add(_moveDir);
+      orbitControls.target.add(_moveDir);
+    }
+  }
+
+  orbitControls.update();
+
+  // Make labels always face camera
+  state.objects.forEach(obj => {
+    if (obj.userData.label) obj.userData.label.lookAt(camera.position);
+  });
+  state.structures.forEach(obj => {
+    if (obj.userData.label) obj.userData.label.lookAt(camera.position);
+  });
+
+  renderer.render(scene, camera);
+}
+animate();
+
+// ═══════════════════════════════════════════
+//  INITIAL HELP
+// ═══════════════════════════════════════════
+setTimeout(() => {
+  const toast = document.getElementById('help-toast');
+  toast.innerHTML = '<kbd>WASD</kbd> 이동 &nbsp; <kbd>QE</kbd> 상하 &nbsp; <kbd>Shift</kbd> 가속 &nbsp; <kbd>우클릭</kbd> 시점 &nbsp;│&nbsp; <kbd>Space</kbd> 재생 &nbsp; <kbd>[ ]</kbd> ±5초 &nbsp; <kbd>, .</kbd> ±1초 &nbsp; <kbd>L</kbd> 반복 &nbsp; <kbd>M</kbd> 음소거';
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 5000);
+}, 1000);
+
+updateObjectList();
+
+// ═══════════════════════════════════════════
+//  PHASE 2: TIMELINE + CUE MARKER SYSTEM
+// ═══════════════════════════════════════════
+
+// Load WaveSurfer with error handling
+let WaveSurfer;
+try {
+  const wsModule = await import('https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.14/dist/wavesurfer.esm.js');
+  WaveSurfer = wsModule.default;
+  console.log('[Timeline] WaveSurfer loaded OK');
+} catch (err) {
+  console.error('[Timeline] WaveSurfer load failed:', err);
+  document.getElementById('tl-empty-msg').innerHTML =
+    '<span style="color:var(--red);">⚠️ WaveSurfer 로드 실패 — 인터넷 연결을 확인하세요</span>';
+}
+
+const CUE_CATEGORIES = {
+  lighting: { label: '조명', color: '#eab308', icon: '💡' },
+  video:    { label: '영상', color: '#3b82f6', icon: '📺' },
+  sfx:      { label: '특수효과', color: '#a855f7', icon: '✨' },
+  pyro:     { label: '불꽃/CO2', color: '#ef4444', icon: '🔥' },
+  stage:    { label: '무대전환', color: '#22c55e', icon: '🎪' },
+  general:  { label: '일반메모', color: '#8888a8', icon: '📝' },
+};
+
+const tlState = {
+  wavesurfer: null,
+  cues: [],
+  nextCueId: 1,
+  isPlaying: false,
+  duration: 0,
+  editingCue: null,
+};
+
+// ─── Load audio file into WaveSurfer ───
+async function loadAudioFile(file) {
+  if (!WaveSurfer) {
+    showToast('WaveSurfer가 로드되지 않았습니다');
+    return;
+  }
+
+  showToast(`"${file.name}" 로딩 중...`);
+
+  // Destroy previous instance
+  if (tlState.wavesurfer) {
+    try { tlState.wavesurfer.destroy(); } catch(e) {}
+    tlState.wavesurfer = null;
+  }
+  if (tlState._audioCtx) {
+    try { tlState._audioCtx.close(); } catch(e) {}
+  }
+  document.getElementById('waveform').innerHTML = '';
+
+  try {
+    // 1. Read file as ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    console.log('[Timeline] File read, size:', Math.round(arrayBuffer.byteLength / 1024), 'KB');
+
+    // 2. Decode with AudioContext (works in sandboxed iframes!)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Resume context if suspended (autoplay policy)
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    const duration = audioBuffer.duration;
+    const sampleRate = audioBuffer.sampleRate;
+    const channelData = audioBuffer.getChannelData(0);
+
+    console.log('[Timeline] Decoded OK — duration:', duration.toFixed(1), 's, sampleRate:', sampleRate);
+
+    tlState._audioCtx = audioCtx;
+    tlState._audioBuffer = audioBuffer;
+    tlState._startedAt = 0;
+    tlState._pausedAt = 0;
+    tlState._sourceNode = null;
+
+    // 3. Create WaveSurfer for VISUAL ONLY (peaks + duration, no media)
+    const ws = WaveSurfer.create({
+      container: '#waveform',
+      waveColor: '#8899bb',
+      progressColor: '#ff6b35',
+      cursorColor: '#ff3300',
+      cursorWidth: 2,
+      barWidth: 2, barGap: 1, barRadius: 2,
+      height: 62,
+      normalize: true,
+      interact: true,
+      peaks: [channelData],
+      duration: duration,
+    });
+
+    tlState.duration = duration;
+    document.getElementById('tl-empty-msg').classList.add('hidden');
+    updateTimeDisplay();
+    renderLyricsOnWaveform();
+    enableTransportButtons();
+    showToast(`음원 로드 완료 (${formatTime(duration)})`);
+    // Reset playback position
+    tlState._pausedAt = 0;
+    tlState._currentTime = 0;
+    // 4. Click on waveform → seek
+    ws.on('interaction', (newTime) => {
+      if (tlState._programmaticSeek) return;
+      seekTo(newTime);
+    });
+
+    tlState.wavesurfer = ws;
+
+    const name = file.name.length > 35 ? file.name.slice(0, 32) + '...' : file.name;
+    document.getElementById('tl-track-name').textContent = '♪ ' + name;
+
+  } catch (err) {
+    console.error('[Timeline] Failed to load audio:', err);
+    showToast('음원 로드 실패: ' + (err.message || err));
+  }
+}
+
+// ─── Safe programmatic seek (won't trigger interaction event loop) ───
+function programmaticSeek(ratio) {
+  if (!tlState.wavesurfer) return;
+  tlState._programmaticSeek = true;
+  tlState.wavesurfer.seekTo(Math.max(0, Math.min(1, ratio)));
+  Promise.resolve().then(() => { tlState._programmaticSeek = false; });
+}
+
+// ─── AudioContext Playback Engine ───
+// Generation counter prevents stale onended callbacks from killing new playback
+tlState._playbackGen = 0;
+
+function startAudioPlayback() {
+  const ctx = tlState._audioCtx;
+  const buf = tlState._audioBuffer;
+  if (!ctx || !buf) return;
+
+  if (ctx.state === 'suspended') ctx.resume();
+
+  // Kill previous source without triggering our stop logic
+  _killSource();
+
+  // Create gain node (once)
+  if (!tlState._gainNode) {
+    tlState._gainNode = ctx.createGain();
+    tlState._gainNode.connect(ctx.destination);
+  }
+  tlState._gainNode.gain.value = tlState._muted ? 0 : tlState._volume;
+
+  const source = ctx.createBufferSource();
+  source.buffer = buf;
+  source.connect(tlState._gainNode);
+
+  const offset = Math.max(0, Math.min(tlState._pausedAt || 0, buf.duration - 0.01));
+  source.start(0, offset);
+
+  tlState._sourceNode = source;
+  tlState._startedAt = ctx.currentTime - offset;
+  tlState.isPlaying = true;
+  const gen = ++tlState._playbackGen;
+
+  setPlayIcon(true);
+
+  // Cancel any existing RAF
+  if (tlState._rafId) { cancelAnimationFrame(tlState._rafId); tlState._rafId = null; }
+
+  // Progress loop
+  function tick() {
+    // Abort if generation changed (means stop/restart happened)
+    if (gen !== tlState._playbackGen || !tlState.isPlaying) return;
+
+    const elapsed = ctx.currentTime - tlState._startedAt;
+    const currentTime = Math.min(elapsed, tlState.duration);
+
+    if (elapsed >= tlState.duration) {
+      // Track finished
+      _killSource();
+      tlState.isPlaying = false;
+      tlState._currentTime = tlState.duration;
+      tlState._pausedAt = tlState.duration;
+      setPlayIcon(false);
+      programmaticSeek(1);
+      updateTimeDisplay();
+
+      if (tlState._loop) {
+        // Auto-restart from beginning after a tiny delay
+        tlState._pausedAt = 0;
+        tlState._currentTime = 0;
+        programmaticSeek(0);
+        setTimeout(() => startAudioPlayback(), 30);
+      }
+      return;
+    }
+
+    tlState._currentTime = currentTime;
+    updateTimeDisplay();
+    updateActiveLyric(currentTime);
+    programmaticSeek(currentTime / tlState.duration);
+    tlState._rafId = requestAnimationFrame(tick);
+  }
+  tlState._rafId = requestAnimationFrame(tick);
+
+  // Safety: if source ends naturally and our tick hasn't caught it
+  source.onended = () => {
+    if (gen !== tlState._playbackGen) return; // stale source, ignore
+    // Let tick() handle the end-of-track logic
+  };
+}
+
+function stopAudioPlayback() {
+  // 1. Save position BEFORE killing anything
+  if (tlState.isPlaying && tlState._audioCtx) {
+    const elapsed = tlState._audioCtx.currentTime - tlState._startedAt;
+    tlState._pausedAt = Math.max(0, Math.min(elapsed, tlState.duration));
+  }
+  tlState._currentTime = tlState._pausedAt;
+
+  // 2. Kill source (detaches onended)
+  _killSource();
+
+  // 3. Cancel RAF
+  if (tlState._rafId) { cancelAnimationFrame(tlState._rafId); tlState._rafId = null; }
+
+  // 4. Update state
+  tlState.isPlaying = false;
+  setPlayIcon(false);
+}
+
+// Low-level: just kill the audio source node, no state changes
+function _killSource() {
+  if (tlState._sourceNode) {
+    tlState._sourceNode.onended = null; // Prevent stale callbacks!
+    try { tlState._sourceNode.stop(); } catch(e) {}
+    try { tlState._sourceNode.disconnect(); } catch(e) {}
+    tlState._sourceNode = null;
+  }
+}
+
+// ─── Seek helper (used by all seek functions) ───
+function seekTo(timeSeconds) {
+  const t = Math.max(0, Math.min(timeSeconds, tlState.duration || 0));
+  const wasPlaying = tlState.isPlaying;
+
+  // Always stop cleanly first
+  if (wasPlaying) {
+    _killSource();
+    if (tlState._rafId) { cancelAnimationFrame(tlState._rafId); tlState._rafId = null; }
+    tlState.isPlaying = false;
+  }
+
+  // Set new position
+  tlState._pausedAt = t;
+  tlState._currentTime = t;
+
+  // Update visuals
+  if (tlState.duration) programmaticSeek(t / tlState.duration);
+  updateTimeDisplay();
+  updateActiveLyric(t);
+
+  // Resume if was playing
+  if (wasPlaying) startAudioPlayback();
+}
+
+// ─── Audio Upload (button) ───
+document.getElementById('audio-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) loadAudioFile(file);
+});
+
+// ─── Audio Drag & Drop ───
+const waveformArea = document.getElementById('waveform-area');
+
+waveformArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  waveformArea.style.outline = '2px solid var(--accent)';
+  waveformArea.style.outlineOffset = '-2px';
+});
+
+waveformArea.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  waveformArea.style.outline = '';
+});
+
+waveformArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  waveformArea.style.outline = '';
+
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('audio/')) {
+    loadAudioFile(file);
+  } else if (file) {
+    showToast('오디오 파일만 업로드 가능합니다 (MP3, WAV, OGG 등)');
+  }
+});
+
+// Also support drop on the entire timeline panel
+document.getElementById('timeline-panel').addEventListener('dragover', (e) => {
+  e.preventDefault();
+});
+document.getElementById('timeline-panel').addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('audio/')) {
+    loadAudioFile(file);
+  }
+});
+
+// ─── Transport Controls ───
+const PLAY_SVG = '<path d="M8 5.14v13.72a1 1 0 001.5.86l11.04-6.86a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z"/>';
+const PAUSE_SVG = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+
+function enableTransportButtons() {
+  ['tl-stop','tl-rw','tl-play','tl-ff','tl-loop'].forEach(id => {
+    document.getElementById(id).classList.remove('disabled');
+  });
+}
+
+function setPlayIcon(playing) {
+  const icon = document.getElementById('tl-play-icon');
+  const btn = document.getElementById('tl-play');
+  icon.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+  btn.classList.toggle('playing', playing);
+}
+
+window.tlPlayPause = function() {
+  if (!tlState._audioBuffer) {
+    showToast('먼저 음원을 업로드하세요');
+    return;
+  }
+  if (tlState.isPlaying) {
+    stopAudioPlayback();
+  } else {
+    // If at end, restart from beginning
+    if (tlState._pausedAt >= tlState.duration - 0.1) {
+      tlState._pausedAt = 0;
+      tlState._currentTime = 0;
+      programmaticSeek(0);
+    }
+    startAudioPlayback();
+  }
+};
+
+window.tlStop = function() {
+  if (!tlState._audioBuffer) return;
+  stopAudioPlayback();
+  seekTo(0);
+};
+
+window.tlSkip = function(seconds) {
+  if (!tlState._audioBuffer) return;
+  // Use _currentTime as reference (always accurate from RAF loop)
+  const base = tlState._currentTime || tlState._pausedAt || 0;
+  seekTo(base + seconds);
+};
+
+// ─── Loop ───
+tlState._loop = false;
+
+window.tlToggleLoop = function() {
+  tlState._loop = !tlState._loop;
+  document.getElementById('tl-loop').classList.toggle('active-loop', tlState._loop);
+  showToast(tlState._loop ? '반복 재생 ON' : '반복 재생 OFF');
+};
+
+// ─── Volume & Mute ───
+tlState._volume = 0.8;
+tlState._muted = false;
+tlState._gainNode = null;
+
+window.tlSetVolume = function(val) {
+  tlState._volume = parseInt(val) / 100;
+  tlState._muted = tlState._volume === 0;
+  applyVolume();
+  updateVolumeIcon();
+};
+
+window.tlToggleMute = function() {
+  tlState._muted = !tlState._muted;
+  applyVolume();
+  updateVolumeIcon();
+  if (!tlState._muted) {
+    document.getElementById('tl-vol-slider').value = Math.round(tlState._volume * 100);
+  }
+};
+
+function applyVolume() {
+  if (tlState._gainNode) {
+    tlState._gainNode.gain.value = tlState._muted ? 0 : tlState._volume;
+  }
+}
+
+function updateVolumeIcon() {
+  const icon = document.getElementById('tl-vol-icon');
+  if (tlState._muted || tlState._volume === 0) {
+    icon.textContent = '🔇';
+    icon.classList.add('muted');
+  } else if (tlState._volume < 0.4) {
+    icon.textContent = '🔈';
+    icon.classList.remove('muted');
+  } else if (tlState._volume < 0.75) {
+    icon.textContent = '🔉';
+    icon.classList.remove('muted');
+  } else {
+    icon.textContent = '🔊';
+    icon.classList.remove('muted');
+  }
+}
+
+window.toggleTimeline = function() {
+  const panel = document.getElementById('timeline-panel');
+  const btn = document.getElementById('tl-toggle-btn');
+  const canvas = document.getElementById('canvas-container');
+  panel.classList.toggle('collapsed');
+  const collapsed = panel.classList.contains('collapsed');
+  btn.classList.toggle('collapsed', collapsed);
+  canvas.style.bottom = collapsed ? '60px' : '228px';
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+};
+
+function updateTimeDisplay() {
+  const cur = tlState._currentTime || 0;
+  const dur = tlState.duration || 0;
+  document.getElementById('tl-time-display').textContent =
+    `${formatTime(cur)} / ${formatTime(dur)}`;
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '00:00.0';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 10);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+}
+
+// ─── Cue System ───
+window.addCueAtCurrentTime = function() {
+  if (!tlState._audioBuffer) {
+    showToast('먼저 음원을 업로드하세요');
+    return;
+  }
+  const time = tlState._currentTime || 0;
+  openCueEditor(null, time);
+};
+
+function openCueEditor(cue, time) {
+  const isEdit = !!cue;
+  const cat = cue ? cue.category : 'lighting';
+  const label = cue ? cue.label : '';
+  const note = cue ? cue.note : '';
+  const t = cue ? cue.time : time;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cue-modal-overlay';
+  overlay.innerHTML = `
+    <div class="cue-modal">
+      <h3>${isEdit ? '✏️ 큐 편집' : '➕ 새 큐 마커'}</h3>
+      <label>시간</label>
+      <input type="text" id="cue-time-input" value="${formatTime(t)}" readonly style="opacity:0.6;">
+      <label>카테고리</label>
+      <select id="cue-cat-input">
+        ${Object.entries(CUE_CATEGORIES).map(([k, v]) =>
+          `<option value="${k}" ${k === cat ? 'selected' : ''}>${v.icon} ${v.label}</option>`
+        ).join('')}
+      </select>
+      <label>제목</label>
+      <input type="text" id="cue-label-input" placeholder="예: 메인 조명 ON" value="${label}">
+      <label>연출 노트</label>
+      <textarea id="cue-note-input" placeholder="파트별 지시사항을 작성하세요...">${note}</textarea>
+      <div class="cue-modal-actions">
+        ${isEdit ? '<button class="btn-delete-cue" onclick="deleteCueFromModal()">삭제</button>' : ''}
+        ${isEdit ? '<button class="btn-cancel" onclick="copyCueFromModal()" style="color:var(--cyan);border-color:var(--cyan);">📋 복사</button>' : ''}
+        <button class="btn-cancel" onclick="closeCueModal()">취소</button>
+        <button class="btn-save" onclick="saveCueFromModal()">${isEdit ? '저장' : '추가'}</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeCueModal();
+  });
+
+  tlState.editingCue = cue;
+  tlState._editTime = t;
+  tlState._modalEl = overlay;
+
+  setTimeout(() => document.getElementById('cue-label-input').focus(), 100);
+}
+
+window.closeCueModal = function() {
+  if (tlState._modalEl) {
+    tlState._modalEl.remove();
+    tlState._modalEl = null;
+    tlState.editingCue = null;
+  }
+};
+
+window.saveCueFromModal = function() {
+  const category = document.getElementById('cue-cat-input').value;
+  const label = document.getElementById('cue-label-input').value.trim() || CUE_CATEGORIES[category].label;
+  const note = document.getElementById('cue-note-input').value.trim();
+
+  if (tlState.editingCue) {
+    tlState.editingCue.category = category;
+    tlState.editingCue.label = label;
+    tlState.editingCue.note = note;
+  } else {
+    tlState.cues.push({
+      id: tlState.nextCueId++,
+      time: tlState._editTime,
+      category,
+      label,
+      note,
+    });
+  }
+
+  tlState.cues.sort((a, b) => a.time - b.time);
+  closeCueModal();
+  renderCueMarkers();
+  renderCueTags();
+};
+
+window.deleteCueFromModal = function() {
+  if (tlState.editingCue) {
+    tlState.cues = tlState.cues.filter(c => c.id !== tlState.editingCue.id);
+    closeCueModal();
+    renderCueMarkers();
+    renderCueTags();
+    showToast('큐 삭제됨');
+  }
+};
+
+window.copyCueFromModal = function() {
+  if (tlState.editingCue) {
+    copyCue(tlState.editingCue);
+    closeCueModal();
+  }
+};
+
+function renderCueMarkers() {
+  const area = document.getElementById('waveform-area');
+  area.querySelectorAll('.cue-marker').forEach(el => el.remove());
+
+  if (!tlState.duration) return;
+
+  tlState.cues.forEach(cue => {
+    const pct = (cue.time / tlState.duration) * 100;
+    const marker = document.createElement('div');
+    marker.className = `cue-marker ${cue.category}`;
+    marker.style.left = `${pct}%`;
+    marker.dataset.label = `${CUE_CATEGORIES[cue.category].icon} ${cue.label}`;
+    marker.dataset.cueId = cue.id;
+    marker.title = `${formatTime(cue.time)} — ${cue.label}\n${cue.note}\n\n드래그: 타이밍 조정 | 클릭: 편집 | 우클릭: 복사`;
+
+    // ── Click → edit (only if not dragged) ──
+    let didDrag = false;
+    marker.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!didDrag) openCueEditor(cue);
+    });
+
+    // ── Right-click → copy ──
+    marker.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      copyCue(cue);
+      marker.classList.add('copied');
+      setTimeout(() => marker.classList.remove('copied'), 400);
+    });
+
+    // ── Drag → reposition ──
+    marker.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // left click only
+      e.stopPropagation();
+      e.preventDefault();
+      didDrag = false;
+
+      const areaRect = area.getBoundingClientRect();
+      marker.classList.add('dragging');
+
+      // Show time tooltip during drag
+      const tooltip = document.createElement('div');
+      tooltip.style.cssText = `
+        position:fixed; padding:2px 6px; background:var(--bg-tertiary);
+        border:1px solid var(--accent); border-radius:3px;
+        font-size:10px; font-family:'JetBrains Mono',monospace;
+        color:var(--accent); pointer-events:none; z-index:100;
+        white-space:nowrap;
+      `;
+      document.body.appendChild(tooltip);
+
+      function onDragMove(ev) {
+        didDrag = true;
+        const x = ev.clientX - areaRect.left;
+        const ratio = Math.max(0, Math.min(1, x / areaRect.width));
+        const newTime = ratio * tlState.duration;
+        marker.style.left = `${ratio * 100}%`;
+        tooltip.textContent = formatTime(newTime);
+        tooltip.style.left = `${ev.clientX + 12}px`;
+        tooltip.style.top = `${ev.clientY - 20}px`;
+      }
+
+      function onDragEnd(ev) {
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        marker.classList.remove('dragging');
+        tooltip.remove();
+
+        if (didDrag) {
+          const x = ev.clientX - areaRect.left;
+          const ratio = Math.max(0, Math.min(1, x / areaRect.width));
+          cue.time = ratio * tlState.duration;
+          tlState.cues.sort((a, b) => a.time - b.time);
+          renderCueMarkers();
+          renderCueTags();
+          showToast(`큐 "${cue.label}" → ${formatTime(cue.time)}`);
+        }
+      }
+
+      document.addEventListener('mousemove', onDragMove);
+      document.addEventListener('mouseup', onDragEnd);
+    });
+
+    area.appendChild(marker);
+  });
+}
+
+// ─── Cue Clipboard (Copy / Paste) ───
+tlState._cueClipboard = null;
+
+function copyCue(cue) {
+  tlState._cueClipboard = {
+    category: cue.category,
+    label: cue.label,
+    note: cue.note,
+  };
+  showToast(`큐 "${cue.label}" 복사됨 — 재생 위치에서 Ctrl+V로 붙여넣기`);
+}
+
+function pasteCue() {
+  if (!tlState._cueClipboard) {
+    showToast('복사된 큐가 없습니다 — 큐 마커를 우클릭하여 복사하세요');
+    return;
+  }
+  if (!tlState._audioBuffer) {
+    showToast('먼저 음원을 업로드하세요');
+    return;
+  }
+  const time = tlState._currentTime || 0;
+  const clip = tlState._cueClipboard;
+  tlState.cues.push({
+    id: tlState.nextCueId++,
+    time,
+    category: clip.category,
+    label: clip.label,
+    note: clip.note,
+  });
+  tlState.cues.sort((a, b) => a.time - b.time);
+  renderCueMarkers();
+  renderCueTags();
+  showToast(`큐 "${clip.label}" 붙여넣기 @ ${formatTime(time)}`);
+}
+
+function renderCueTags() {
+  const container = document.getElementById('cue-tag-list');
+  if (tlState.cues.length === 0) {
+    container.innerHTML = '<span style="font-size:10px;color:var(--text-muted);">큐가 없습니다 — 재생 위치에서 "+ 큐 추가" 클릭</span>';
+    return;
+  }
+
+  container.innerHTML = tlState.cues.map(cue => {
+    const cat = CUE_CATEGORIES[cue.category];
+    return `<span class="cue-tag" style="background:${cat.color}22;color:${cat.color};"
+                  onclick="seekToCue(${cue.id})" title="${cue.note || '노트 없음'}">
+      ${formatTime(cue.time)} ${cat.icon} ${cue.label}
+    </span>`;
+  }).join('');
+}
+
+window.seekToCue = function(cueId) {
+  const cue = tlState.cues.find(c => c.id === cueId);
+  if (!cue) return;
+  // Always stop first, then seek and play from cue position
+  if (tlState.isPlaying) stopAudioPlayback();
+  tlState._pausedAt = cue.time;
+  tlState._currentTime = cue.time;
+  if (tlState.duration) programmaticSeek(cue.time / tlState.duration);
+  updateTimeDisplay();
+  updateActiveLyric(cue.time);
+  if (tlState._audioBuffer) startAudioPlayback();
+};
+
+renderCueTags();
+
+// ═══════════════════════════════════════════
+//  LYRICS SYSTEM (LRC Parser + Sync Display)
+// ═══════════════════════════════════════════
+const lyricsState = {
+  lines: [],        // { time: seconds, text: string }
+  activeLine: -1,
+};
+
+// ─── LRC Parser ───
+function parseLRC(text) {
+  const lines = [];
+  const regex = /\[(\d{2}):(\d{2})[\.\:](\d{2,3})\]\s*(.*)/g;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const min = parseInt(match[1]);
+    const sec = parseInt(match[2]);
+    const ms = match[3].length === 2 ? parseInt(match[3]) * 10 : parseInt(match[3]);
+    const time = min * 60 + sec + ms / 1000;
+    const txt = match[4].trim();
+    if (txt) lines.push({ time, text: txt });
+  }
+
+  lines.sort((a, b) => a.time - b.time);
+  return lines;
+}
+
+// ─── LRC Upload ───
+document.getElementById('lrc-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const text = await file.text();
+  lyricsState.lines = parseLRC(text);
+  lyricsState.activeLine = -1;
+
+  if (lyricsState.lines.length === 0) {
+    showToast('유효한 가사를 찾지 못했습니다. LRC 포맷을 확인하세요.');
+    return;
+  }
+
+  showToast(`가사 로드 완료 (${lyricsState.lines.length}줄)`);
+  renderLyricsStrip();
+  renderLyricsOnWaveform();
+});
+
+// ─── Render horizontal lyrics strip ───
+function renderLyricsStrip() {
+  const inner = document.getElementById('lyrics-inner');
+  if (lyricsState.lines.length === 0) {
+    inner.innerHTML = '<span class="lyrics-empty">LRC 가사 파일을 업로드하면 싱크 가사가 표시됩니다</span>';
+    return;
+  }
+
+  inner.innerHTML = lyricsState.lines.map((line, idx) =>
+    `<span class="lyric-line" data-idx="${idx}" onclick="seekToLyric(${idx})"
+          title="${formatTime(line.time)}">${line.text}</span>`
+  ).join('');
+}
+
+// ─── Render lyric markers on waveform ───
+function renderLyricsOnWaveform() {
+  const area = document.getElementById('waveform-area');
+  area.querySelectorAll('.lyric-marker').forEach(el => el.remove());
+  if (!tlState.duration || lyricsState.lines.length === 0) return;
+
+  lyricsState.lines.forEach(line => {
+    const pct = (line.time / tlState.duration) * 100;
+    const marker = document.createElement('div');
+    marker.className = 'lyric-marker';
+    marker.style.cssText = `
+      position:absolute; top:0; bottom:0; left:${pct}%;
+      width:1px; background:rgba(6,182,212,0.3);
+      pointer-events:none; z-index:1;
+    `;
+    area.appendChild(marker);
+  });
+}
+
+// ─── Update active lyric on playback ───
+function updateActiveLyric(currentTime) {
+  if (lyricsState.lines.length === 0) return;
+
+  let activeIdx = -1;
+  for (let i = lyricsState.lines.length - 1; i >= 0; i--) {
+    if (currentTime >= lyricsState.lines[i].time) {
+      activeIdx = i;
+      break;
+    }
+  }
+
+  if (activeIdx === lyricsState.activeLine) return;
+  lyricsState.activeLine = activeIdx;
+
+  const inner = document.getElementById('lyrics-inner');
+  const lineEls = inner.querySelectorAll('.lyric-line');
+  lineEls.forEach((el, idx) => {
+    el.classList.toggle('active', idx === activeIdx);
+    el.classList.toggle('past', idx < activeIdx);
+  });
+
+  // Auto-scroll to center active line
+  if (activeIdx >= 0 && lineEls[activeIdx]) {
+    const container = document.getElementById('lyrics-container');
+    const activeEl = lineEls[activeIdx];
+    const containerW = container.offsetWidth;
+    const elLeft = activeEl.offsetLeft;
+    const elWidth = activeEl.offsetWidth;
+    const scrollTarget = elLeft - containerW / 2 + elWidth / 2;
+    inner.style.transform = `translateX(${-Math.max(0, scrollTarget)}px)`;
+  }
+}
+
+// ─── Seek to lyric line ───
+window.seekToLyric = function(idx) {
+  const line = lyricsState.lines[idx];
+  if (line) seekTo(line.time);
+};
+
+
+// ═══════════════════════════════════════════
+//  SUPABASE — PROJECT SAVE / SHARE / LOAD
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://dwvgzfxolgeaoiqdjozi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3dmd6ZnhvbGdlYW9pcWRqb3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NDU4NTYsImV4cCI6MjA4MTUyMTg1Nn0.hbV8fT5mfaPNbYL71FI-YteLkeifikJfgAQu_QL6gsQ';
+const REST_URL = SUPABASE_URL + '/rest/v1';
+
+// Direct Supabase REST API helper — no SDK dependency
+async function sbFetch(table, { method = 'GET', params = {}, body = null, headers = {} } = {}) {
+  const url = new URL(`${REST_URL}/${table}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const reqHeaders = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': method === 'POST' ? 'return=representation' :
+              method === 'PATCH' ? 'return=representation' :
+              method === 'DELETE' ? 'return=minimal' : '',
+    ...headers,
+  };
+
+  const resp = await fetch(url.toString(), {
+    method,
+    headers: reqHeaders,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Supabase ${resp.status}: ${errText}`);
+  }
+
+  if (method === 'DELETE') return null;
+  const data = await resp.json();
+  return data;
+}
+
+console.log('[Supabase] REST API mode — no SDK dependency');
+
+// SHA-256 hash utility
+async function sha256(text) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Project state
+const projectState = {
+  id: null,
+  title: 'YES24 LIVE HALL — 무대 배치',
+  shareCode: null,
+  password: null,       // plain text (session only, not persisted)
+  passwordHash: null,   // SHA-256 hash (stored in DB)
+  audioDataUrl: null,
+  audioBlob: null,
+  audioStoragePath: null,
+  audioName: null,
+  audioType: null,
+  lrcText: null,
+};
+
+// ─── Serialize project to JSON ───
+function serializeProject() {
+  const objects = state.objects.map(mesh => ({
+    id: mesh.userData.id,
+    type: mesh.userData.type,
+    name: mesh.userData.name,
+    position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+    rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
+    scale: { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z },
+  }));
+
+  const structures = state.structures.map(mesh => ({
+    name: mesh.userData.name,
+    cat: mesh.userData.cat,
+    x: mesh.position.x, y: mesh.position.y, z: mesh.position.z,
+    w: mesh.userData.w, h: mesh.userData.h, d: mesh.userData.d,
+    opacity: mesh.material.opacity,
+  }));
+
+  const cues = tlState.cues.map(c => ({
+    id: c.id, time: c.time, category: c.category, label: c.label, note: c.note,
+  }));
+
+  const lyrics = lyricsState.lines.map(l => ({ time: l.time, text: l.text }));
+
+  return {
+    version: 1,
+    stageWidth: parseFloat(document.getElementById('scale-width').value) || 44,
+    stageDepth: parseFloat(document.getElementById('scale-depth').value) || 52,
+    objects,
+    structures,
+    cues,
+    nextCueId: tlState.nextCueId,
+    lyrics,
+    camera: {
+      position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+      target: { x: orbitControls.target.x, y: orbitControls.target.y, z: orbitControls.target.z },
+    },
+  };
+}
+
+// ─── Deserialize and restore ───
+function deserializeProject(data, audioDataUrl, audioName, lrcText) {
+  console.log('[Deserialize] Start — data type:', typeof data, ', audioName:', audioName, ', hasLrc:', !!lrcText);
+
+  // Handle string-encoded project_data (Supabase REST may return as string)
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch(e) {
+      console.error('[Deserialize] JSON parse failed:', e);
+      showToast('프로젝트 데이터 파싱 실패');
+      return;
+    }
+  }
+
+  if (!data || !data.version) {
+    console.warn('[Deserialize] Invalid data — missing version. Keys:', data ? Object.keys(data) : 'null');
+    showToast('프로젝트 데이터가 비어있습니다');
+    return;
+  }
+
+  console.log('[Deserialize] Data summary:',
+    'structures:', data.structures?.length || 0,
+    'objects:', data.objects?.length || 0,
+    'cues:', data.cues?.length || 0,
+    'lyrics:', data.lyrics?.length || 0,
+  );
+
+  try {
+    // 1. Stage scale
+    if (data.stageWidth) document.getElementById('scale-width').value = data.stageWidth;
+    if (data.stageDepth) document.getElementById('scale-depth').value = data.stageDepth;
+    updateFloorplanScale();
+
+    // 2. Clear existing scene
+    clearStructures();
+    state.objects.forEach(mesh => {
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+        else mesh.material.dispose();
+      }
+    });
+    state.objects = [];
+
+    // 3. Restore structures
+    if (data.structures && data.structures.length > 0) {
+      data.structures.forEach(s => createStructuralBlock(s));
+      console.log('[Deserialize] Structures restored:', data.structures.length);
+    }
+
+    // 4. Restore objects
+    if (data.objects && data.objects.length > 0) {
+      data.objects.forEach(obj => {
+        const mesh = createObject(obj.type, { x: obj.position.x, z: obj.position.z });
+        if (mesh) {
+          mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+          mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+          mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+        }
+      });
+      state.selectedType = null;
+      document.querySelectorAll('.object-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('status-mode').textContent = '선택 모드';
+      console.log('[Deserialize] Objects restored:', data.objects.length);
+    }
+
+    // 5. Restore cues
+    if (data.cues && data.cues.length > 0) {
+      tlState.cues = data.cues;
+      tlState.nextCueId = data.nextCueId || (Math.max(...data.cues.map(c => c.id)) + 1);
+      renderCueMarkers();
+      renderCueTags();
+      console.log('[Deserialize] Cues restored:', data.cues.length);
+    }
+
+    // 6. Restore lyrics
+    if (data.lyrics && data.lyrics.length > 0) {
+      lyricsState.lines = data.lyrics;
+      lyricsState.activeLine = -1;
+      renderLyricsStrip();
+      renderLyricsOnWaveform();
+      console.log('[Deserialize] Lyrics restored:', data.lyrics.length);
+    }
+
+    // 7. Restore camera
+    if (data.camera) {
+      camera.position.set(data.camera.position.x, data.camera.position.y, data.camera.position.z);
+      orbitControls.target.set(data.camera.target.x, data.camera.target.y, data.camera.target.z);
+      orbitControls.update();
+    }
+
+    // 8. Restore audio (async — re-render markers after load)
+    if (audioDataUrl && audioName) {
+      projectState.audioDataUrl = audioDataUrl;
+      projectState.audioName = audioName;
+      console.log('[Deserialize] Restoring audio:', audioName, '(', Math.round(audioDataUrl.length / 1024), 'KB base64)');
+      restoreAudioFromDataUrl(audioDataUrl, audioName).then(() => {
+        // After audio loads, re-render cues and lyrics on waveform
+        setTimeout(() => {
+          renderCueMarkers();
+          renderCueTags();
+          if (data.lyrics && data.lyrics.length > 0) renderLyricsOnWaveform();
+          console.log('[Deserialize] Post-audio markers re-rendered');
+        }, 500);
+      });
+    }
+    if (lrcText) projectState.lrcText = lrcText;
+
+    updateObjectList();
+    updateObjectCount();
+    console.log('[Deserialize] Complete ✓');
+
+  } catch(e) {
+    console.error('[Deserialize] Error:', e);
+    showToast('프로젝트 복원 중 오류: ' + e.message);
+  }
+}
+
+async function restoreAudioFromDataUrl(dataUrl, fileName) {
+  try {
+    console.log('[AudioRestore] Starting for:', fileName, 'source:', dataUrl.substring(0, 60) + '...');
+    const resp = await fetch(dataUrl);
+    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
+    const blob = await resp.blob();
+    console.log('[AudioRestore] Blob:', Math.round(blob.size / 1024), 'KB', blob.type);
+    
+    // Keep blob for future saves
+    projectState.audioBlob = blob;
+    
+    const file = new File([blob], fileName, { type: blob.type || 'audio/mpeg' });
+    await loadAudioFile(file);
+    console.log('[AudioRestore] Audio loaded OK');
+  } catch(e) {
+    console.error('[AudioRestore] Failed:', e);
+    showToast('음원 복원 실패 — 음원 파일을 다시 업로드하세요');
+  }
+}
+
+// ─── Share code generator ───
+function generateShareCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// ─── Format date ───
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ═══════════════════════════════════════════
+//  PROJECT MANAGER MODAL
+// ═══════════════════════════════════════════
+window.openProjectManager = function(tab = 'save') {
+  // Remove existing
+  document.getElementById('pm-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'pm-overlay';
+  overlay.id = 'pm-overlay';
+  overlay.innerHTML = `
+    <div class="pm-modal">
+      <div class="pm-header">
+        <h3>📁 프로젝트 관리</h3>
+        <button class="pm-close" onclick="closePM()">✕</button>
+      </div>
+      <div class="pm-tabs">
+        <div class="pm-tab ${tab === 'save' ? 'active' : ''}" data-tab="save" onclick="switchPMTab('save')">💾 저장</div>
+        <div class="pm-tab ${tab === 'list' ? 'active' : ''}" data-tab="list" onclick="switchPMTab('list')">📂 프로젝트 목록</div>
+        <div class="pm-tab ${tab === 'share' ? 'active' : ''}" data-tab="share" onclick="switchPMTab('share')">🔗 공유</div>
+      </div>
+      <div class="pm-body" id="pm-body"></div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePM(); });
+
+  switchPMTab(tab);
+};
+
+window.closePM = function() {
+  document.getElementById('pm-overlay')?.remove();
+};
+
+window.switchPMTab = function(tab) {
+  document.querySelectorAll('.pm-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  const body = document.getElementById('pm-body');
+
+  if (tab === 'save') renderSaveTab(body);
+  else if (tab === 'list') renderListTab(body);
+  else if (tab === 'share') renderShareTab(body);
+};
+
+// ─── SAVE TAB ───
+function renderSaveTab(container) {
+  const isUpdate = !!projectState.id;
+  const hasPassword = !!projectState.passwordHash;
+  container.innerHTML = `
+    <div class="pm-field">
+      <label>프로젝트 이름</label>
+      <input type="text" id="pm-title" value="${projectState.title}" 
+             placeholder="프로젝트 이름을 입력하세요">
+    </div>
+    <div class="pm-field">
+      <label>🔒 비밀번호 ${hasPassword ? '<span style="color:var(--green);font-size:10px;">(설정됨)</span>' : '<span style="color:var(--text-muted);font-size:10px;">(선택사항)</span>'}</label>
+      <div style="display:flex;gap:6px;">
+        <input type="password" id="pm-password" 
+               placeholder="${hasPassword ? '변경하려면 새 비밀번호 입력' : '비밀번호 설정 (미입력 시 공개)'}"
+               style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:9px 12px;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        ${hasPassword ? '<button onclick="removePassword()" style="background:var(--bg-tertiary);border:1px solid var(--border);color:var(--red);padding:8px 12px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">🔓 해제</button>' : ''}
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="pm-save-btn" id="pm-save-btn" onclick="doSaveProject(false)">
+        ${isUpdate ? '🔄 업데이트 저장' : '💾 새 프로젝트로 저장'}
+      </button>
+      ${isUpdate ? '<button class="pm-save-btn" style="background:var(--cyan);" onclick="doSaveProject(true)">📋 복사본 저장</button>' : ''}
+    </div>
+    <div class="pm-status" id="pm-status"></div>
+    <div id="pm-share-after-save"></div>
+  `;
+
+  setTimeout(() => document.getElementById('pm-title')?.focus(), 100);
+}
+
+window.removePassword = function() {
+  projectState.passwordHash = null;
+  projectState.password = null;
+  showToast('비밀번호가 해제되었습니다 — 저장하면 적용됩니다');
+  const body = document.getElementById('pm-body');
+  if (body) renderSaveTab(body);
+};
+
+// ─── LIST TAB ───
+let _listProjects = []; // temp storage for list actions
+
+async function renderListTab(container) {
+  // Load by share code section at top
+  let html = `
+    <div class="pm-load-code-box">
+      <input type="text" id="pm-code-input" placeholder="공유코드 6자리 입력" maxlength="6"
+             style="text-transform:uppercase;" onkeydown="if(event.key==='Enter') doLoadByCode()">
+      <button onclick="doLoadByCode()">📂 불러오기</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin:-8px 0 14px 4px;">
+      상대방에게 받은 공유코드를 입력하면 프로젝트를 불러옵니다
+    </div>
+    <div id="pm-project-list"><div class="pm-loading">⏳ 프로젝트 목록을 불러오는 중...</div></div>
+  `;
+  container.innerHTML = html;
+
+  // Load list
+  const listEl = document.getElementById('pm-project-list');
+
+  try {
+    const data = await sbFetch('stage_projects', {
+      params: {
+        select: 'id,title,venue,share_code,password_hash,created_at,updated_at',
+        order: 'updated_at.desc',
+        limit: '20',
+      },
+    });
+
+    if (!data || data.length === 0) {
+      listEl.innerHTML = '<div class="pm-list-empty">저장된 프로젝트가 없습니다</div>';
+      return;
+    }
+
+    _listProjects = data;
+
+    listEl.innerHTML = data.map((p, i) => `
+      <div class="pm-project-item" ondblclick="_pmAction('load',${i})">
+        <div class="pm-project-info">
+          <div class="pm-project-title">${p.password_hash ? '🔒 ' : ''}${(p.title || '이름 없음').replace(/</g, '&lt;')}</div>
+          <div class="pm-project-meta">
+            ${p.share_code ? `🔗 ${p.share_code} · ` : ''}${formatDate(p.updated_at)}
+          </div>
+        </div>
+        <div class="pm-project-actions">
+          <button class="load-btn" onclick="event.stopPropagation(); _pmAction('load',${i})">📂 열기</button>
+          <button onclick="event.stopPropagation(); _pmAction('share',${i})">🔗</button>
+          <button class="del-btn" onclick="event.stopPropagation(); _pmAction('delete',${i})">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(err) {
+    console.error('[PM] List error:', err);
+    listEl.innerHTML = `<div class="pm-list-empty">⚠️ 목록 불러오기 실패<br><span style="font-size:10px;color:var(--red);">${err.message}</span></div>`;
+  }
+}
+
+// Safe action handler for list buttons
+window._pmAction = async function(action, index) {
+  const p = _listProjects[index];
+  if (!p) return;
+
+  switch(action) {
+    case 'load':
+      doLoadProject(p.id);
+      break;
+    case 'share':
+      if (!p.share_code) {
+        showToast('공유 코드가 없는 프로젝트입니다');
+        return;
+      }
+      const shareText = p.share_code;
+      navigator.clipboard.writeText(shareText).then(() => {
+        showToast(`공유코드 ${p.share_code} 복사됨 ✓${p.password_hash ? ' (비밀번호 보호됨)' : ''}`);
+      }).catch(() => {
+        prompt('공유코드를 복사하세요:', shareText);
+      });
+      break;
+    case 'delete':
+      if (p.password_hash) {
+        const ok = await verifyProjectPassword(p.password_hash, p.title);
+        if (!ok) { showToast('비밀번호가 일치하지 않습니다'); return; }
+      }
+      doDeleteProject(p.id, p.title);
+      break;
+  }
+};
+
+// ─── Load by share code (from input) ───
+window.doLoadByCode = async function() {
+  const input = document.getElementById('pm-code-input');
+  const code = input?.value.trim().toUpperCase();
+  if (!code || code.length < 4) {
+    showToast('공유코드를 입력하세요');
+    return;
+  }
+  closePM();
+  await loadProjectByShareCode(code);
+};
+
+// ─── SHARE TAB ───
+function renderShareTab(container) {
+  if (!projectState.shareCode) {
+    container.innerHTML = `
+      <div class="pm-list-empty">
+        아직 저장된 프로젝트가 없습니다<br><br>
+        먼저 💾 저장 탭에서 프로젝트를 저장하면<br>
+        공유 코드가 자동 생성됩니다
+      </div>
+    `;
+    return;
+  }
+
+  const isHosted = window.location.protocol.startsWith('http');
+  const shareUrl = isHosted
+    ? `${window.location.origin}${window.location.pathname}?share=${projectState.shareCode}`
+    : null;
+
+  const lockStatus = projectState.passwordHash
+    ? '<div style="font-size:12px;color:var(--yellow);text-align:center;padding:10px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:6px;margin-bottom:14px;">🔒 비밀번호 보호됨 — 상대방에게 비밀번호도 함께 전달하세요</div>'
+    : '<div style="font-size:12px;color:var(--green);text-align:center;padding:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:6px;margin-bottom:14px;">🔓 공개 프로젝트 — 코드만 있으면 누구나 열 수 있습니다</div>';
+
+  // URL section (only when hosted on a server)
+  const urlSection = shareUrl ? `
+    <div class="pm-share-box" style="margin-top:12px;">
+      <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;">🔗 공유 링크</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" id="pm-share-url" value="${shareUrl}" readonly
+               style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--accent);padding:8px 10px;border-radius:6px;font-size:11px;font-family:monospace;">
+        <button class="pm-copy-btn" style="white-space:nowrap;" onclick="doCopyShareUrl()">📋 복사</button>
+      </div>
+      <div style="font-size:10px;color:var(--green);margin-top:4px;">
+        ✓ 이 링크를 카톡에 보내면 상대방이 바로 열 수 있습니다
+      </div>
+    </div>
+  ` : '';
+
+  // Instructions differ based on hosted or local
+  const instructions = shareUrl ? `
+    <div style="font-size:11px; color:var(--text-secondary); line-height:1.8;">
+      <b>방법 1 — 링크 공유 (추천)</b><br>
+      위의 공유 링크를 카톡 · 이메일로 전달하면 끝!<br>
+      <br>
+      <b>방법 2 — 코드 공유</b><br>
+      상대방이 이 사이트에 접속 → 📂 열기 → 코드 입력<br>
+      ${projectState.passwordHash ? '<br><b>※</b> 비밀번호도 함께 전달하세요' : ''}
+    </div>
+  ` : `
+    <div style="font-size:11px; color:var(--text-secondary); line-height:1.8;">
+      <b>1.</b> 이 HTML 파일을 카톡 · 이메일로 상대방에게 전달<br>
+      <b>2.</b> 공유코드 <b style="color:var(--accent);letter-spacing:2px;font-size:13px;">${projectState.shareCode}</b> 도 함께 전달<br>
+      ${projectState.passwordHash ? '<b>3.</b> 비밀번호도 함께 전달<br>' : ''}
+      <br>
+      <b>상대방:</b> HTML 파일 열기 → 📂 열기 → 코드 입력 → 불러오기<br>
+      <b>→</b> 3D 무대 · 큐시트 · 가사 · 음원 모두 복원됩니다
+    </div>
+  `;
+
+  container.innerHTML = `
+    ${lockStatus}
+    <div class="pm-share-box">
+      <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;">공유 코드</label>
+      <div class="pm-share-code" id="pm-share-code-display">${projectState.shareCode}</div>
+      <button class="pm-copy-btn" style="width:100%;margin-top:4px;" id="pm-copy-code-btn" onclick="doCopyShareCode()">📋 코드 복사</button>
+    </div>
+
+    ${urlSection}
+
+    <div style="margin-top:14px; padding:14px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:8px;">
+      <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:10px;">📋 공유 방법</div>
+      ${instructions}
+    </div>
+
+    <div style="margin-top:14px;">
+      <button class="pm-save-btn" style="background:var(--cyan);" onclick="doSaveProject(false); setTimeout(()=>switchPMTab('share'),1500);">
+        🔄 현재 상태로 업데이트
+      </button>
+      <div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:6px;">
+        공유된 프로젝트의 내용이 최신 상태로 갱신됩니다
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════
+//  SUPABASE STORAGE — Audio Upload/Download
+// ═══════════════════════════════════════════
+const STORAGE_URL = SUPABASE_URL + '/storage/v1';
+
+async function storageUpload(bucket, path, blob, contentType) {
+  const url = `${STORAGE_URL}/object/${bucket}/${path}`;
+  console.log('[Storage] Uploading:', path, Math.round(blob.size / 1024), 'KB');
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': contentType || blob.type || 'application/octet-stream',
+      'x-upsert': 'true',
+    },
+    body: blob,
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Storage upload failed (${resp.status}): ${errText}`);
+  }
+  console.log('[Storage] Upload OK:', path);
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+
+function storagePublicUrl(bucket, path) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+
+// ═══════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════
+
+// ─── Save ───
+window.doSaveProject = async function(asNew = false) {
+  // Update title from input
+  const titleInput = document.getElementById('pm-title');
+  if (titleInput) {
+    projectState.title = titleInput.value.trim() || '이름 없는 프로젝트';
+    document.getElementById('project-name').textContent = projectState.title;
+  }
+
+  const statusEl = document.getElementById('pm-status');
+  const saveBtn = document.getElementById('pm-save-btn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ 저장 중...'; }
+
+  try {
+    // Step 0: Handle password
+    const pwInput = document.getElementById('pm-password');
+    const newPassword = pwInput?.value?.trim();
+    if (newPassword) {
+      projectState.passwordHash = await sha256(newPassword);
+      projectState.password = newPassword;
+      console.log('[Save] Password set');
+    }
+
+    // Step 1: Generate project ID if new
+    if (!projectState.id || asNew) {
+      projectState.id = crypto.randomUUID();
+      projectState.shareCode = generateShareCode();
+      projectState.audioStoragePath = null; // Force re-upload for new project
+    }
+
+    // Step 2: Upload audio to Storage if available
+    let audioStoragePath = projectState.audioStoragePath || null;
+
+    if (projectState.audioBlob && !audioStoragePath) {
+      if (saveBtn) saveBtn.textContent = '⏳ 음원 업로드 중...';
+      const safeName = (projectState.audioName || 'audio.mp3').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `${projectState.id}/${safeName}`;
+
+      try {
+        const publicUrl = await storageUpload('stage-audio', storagePath, projectState.audioBlob, projectState.audioType);
+        audioStoragePath = storagePath;
+        projectState.audioStoragePath = storagePath;
+        console.log('[Save] Audio uploaded to storage:', publicUrl);
+      } catch (storageErr) {
+        console.warn('[Save] Storage upload failed, trying base64 fallback:', storageErr.message);
+        // Fallback: try base64 if small enough
+      }
+    }
+
+    if (saveBtn) saveBtn.textContent = '⏳ 프로젝트 저장 중...';
+
+    // Step 3: Build payload
+    const payload = {
+      id: projectState.id,
+      title: projectState.title,
+      venue: 'yes24',
+      project_data: serializeProject(),
+      audio_name: projectState.audioName || null,
+      audio_type: projectState.audioType || null,
+      lrc_text: projectState.lrcText || null,
+      password_hash: projectState.passwordHash || null,
+      is_public: true,
+      share_code: projectState.shareCode,
+    };
+
+    // Store audio reference: storage path or base64 fallback
+    if (audioStoragePath) {
+      payload.audio_data = 'storage:' + audioStoragePath;
+    } else if (projectState.audioDataUrl) {
+      // Base64 fallback for small files
+      const sizeMB = (projectState.audioDataUrl.length * 0.75) / (1024 * 1024);
+      if (sizeMB <= 4.5) {
+        payload.audio_data = projectState.audioDataUrl;
+      } else {
+        payload.audio_data = null;
+        console.warn('[Save] Audio too large for DB, storage upload also failed');
+      }
+    } else {
+      payload.audio_data = null;
+    }
+
+    const pd = payload.project_data;
+    console.log('[Save] Payload:',
+      'structures:', pd.structures?.length || 0,
+      '| objects:', pd.objects?.length || 0,
+      '| cues:', pd.cues?.length || 0,
+      '| lyrics:', pd.lyrics?.length || 0,
+      '| audio:', audioStoragePath ? 'storage' : (payload.audio_data ? 'base64' : 'none'),
+    );
+
+    // Step 4: Upsert to database
+    // Use POST with upsert preference for both insert and update
+    const data = await sbFetch('stage_projects', {
+      method: 'POST',
+      body: payload,
+      headers: { 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    });
+    const result = Array.isArray(data) ? data[0] : data;
+
+    console.log('[Save] Success:', result.id, 'code:', result.share_code);
+
+    if (statusEl) {
+      statusEl.className = 'pm-status success';
+      statusEl.textContent = `✓ 저장 완료 — 공유코드: ${result.share_code}`;
+    }
+
+    // Show share info after save
+    const afterSave = document.getElementById('pm-share-after-save');
+    if (afterSave) {
+      const lockInfo = projectState.passwordHash
+        ? '<div style="font-size:11px;color:var(--yellow);text-align:center;margin-top:8px;">🔒 비밀번호 보호됨 — 상대방에게 비밀번호도 함께 전달하세요</div>'
+        : '';
+      const isHosted = window.location.protocol.startsWith('http');
+      const shareUrl = isHosted ? `${window.location.origin}${window.location.pathname}?share=${result.share_code}` : null;
+      const urlBlock = shareUrl ? `
+        <div style="margin-top:10px;display:flex;gap:6px;align-items:center;">
+          <input type="text" value="${shareUrl}" readonly onclick="this.select()"
+                 style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--accent);padding:7px 10px;border-radius:6px;font-size:10px;font-family:monospace;">
+          <button onclick="navigator.clipboard.writeText('${shareUrl}');showToast('링크 복사됨 ✓')" 
+                  style="background:var(--accent);color:#000;border:none;padding:7px 12px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">📋 링크 복사</button>
+        </div>
+        <div style="font-size:10px;color:var(--green);margin-top:4px;text-align:center;">✓ 이 링크를 카톡에 보내면 상대방이 바로 열 수 있습니다</div>
+      ` : '';
+      afterSave.innerHTML = `
+        <div class="pm-share-box" style="margin-top:12px;">
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:4px;">공유코드</div>
+          <div class="pm-share-code">${result.share_code}</div>
+          ${urlBlock}
+          ${!shareUrl ? '<div class="pm-share-hint">이 코드를 상대방에게 전달하세요</div>' : ''}
+          ${lockInfo}
+        </div>
+      `;
+    }
+
+    showToast('프로젝트 저장 완료 ✓');
+
+  } catch(err) {
+    console.error('[Save] Error:', err);
+    if (statusEl) {
+      statusEl.className = 'pm-status error';
+      statusEl.textContent = `✗ 저장 실패: ${err.message || err}`;
+    }
+    showToast('저장 실패: ' + (err.message || err));
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = projectState.id ? '🔄 업데이트 저장' : '💾 새 프로젝트로 저장';
+    }
+  }
+};
+
+// ─── Load ───
+window.doLoadProject = async function(projectId) {
+  showToast('프로젝트 로딩 중...');
+  closePM();
+
+  try {
+    const data = await sbFetch('stage_projects', {
+      params: { id: `eq.${projectId}`, select: '*' },
+    });
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) throw new Error('Not found');
+
+    // Check password
+    if (row.password_hash) {
+      const ok = await verifyProjectPassword(row.password_hash, row.title);
+      if (!ok) {
+        showToast('비밀번호가 일치하지 않습니다');
+        return;
+      }
+    }
+
+    applyLoadedProject(row);
+  } catch(err) {
+    console.error('[Load] Error:', err);
+    showToast('로드 실패: ' + (err.message || err));
+  }
+};
+
+// ─── Password verification modal ───
+function verifyProjectPassword(hash, title) {
+  return new Promise((resolve) => {
+    document.getElementById('pm-overlay')?.remove(); // close PM if open
+
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-overlay';
+    overlay.id = 'pw-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal" style="width:380px;">
+        <div class="pm-header">
+          <h3>🔒 비밀번호 입력</h3>
+          <button class="pm-close" id="pw-cancel">✕</button>
+        </div>
+        <div class="pm-body">
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+            "${title || '프로젝트'}" 은(는) 비밀번호로 보호되어 있습니다
+          </div>
+          <div class="pm-field">
+            <input type="password" id="pw-input" placeholder="비밀번호를 입력하세요"
+                   style="width:100%;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:10px 12px;border-radius:6px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div id="pw-error" style="font-size:11px;color:var(--red);margin-bottom:8px;display:none;"></div>
+          <button class="pm-save-btn" id="pw-submit">확인</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById('pw-input');
+    const submit = document.getElementById('pw-submit');
+    const cancel = document.getElementById('pw-cancel');
+    const errorEl = document.getElementById('pw-error');
+
+    const cleanup = () => { overlay.remove(); };
+
+    async function tryVerify() {
+      const pw = input.value.trim();
+      if (!pw) { input.focus(); return; }
+      
+      submit.disabled = true;
+      submit.textContent = '⏳ 확인 중...';
+      
+      const inputHash = await sha256(pw);
+      if (inputHash === hash) {
+        cleanup();
+        resolve(true);
+      } else {
+        errorEl.textContent = '비밀번호가 일치하지 않습니다';
+        errorEl.style.display = 'block';
+        input.value = '';
+        input.focus();
+        submit.disabled = false;
+        submit.textContent = '확인';
+      }
+    }
+
+    submit.addEventListener('click', tryVerify);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryVerify(); });
+    cancel.addEventListener('click', () => { cleanup(); resolve(false); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { cleanup(); resolve(false); } });
+
+    setTimeout(() => input.focus(), 100);
+  });
+}
+
+// ─── Apply loaded project data ───
+function applyLoadedProject(row) {
+  console.log('[Load] Applying:', row.title,
+    '| audio:', row.audio_data ? (row.audio_data.startsWith('storage:') ? 'storage' : 'base64') : 'none',
+    '| hasPassword:', !!row.password_hash
+  );
+
+  projectState.id = row.id;
+  projectState.title = row.title;
+  projectState.shareCode = row.share_code;
+  projectState.passwordHash = row.password_hash || null;
+  projectState.audioName = row.audio_name;
+  projectState.audioType = row.audio_type;
+  projectState.lrcText = row.lrc_text;
+  projectState.audioBlob = null;
+
+  // Resolve audio data
+  let audioDataUrl = null;
+  if (row.audio_data) {
+    if (row.audio_data.startsWith('storage:')) {
+      const path = row.audio_data.replace('storage:', '');
+      audioDataUrl = storagePublicUrl('stage-audio', path);
+      projectState.audioStoragePath = path;
+      console.log('[Load] Audio from storage:', audioDataUrl);
+    } else {
+      audioDataUrl = row.audio_data;
+      projectState.audioStoragePath = null;
+      projectState.audioDataUrl = row.audio_data;
+    }
+  }
+
+  document.getElementById('project-name').textContent = row.title;
+  deserializeProject(row.project_data, audioDataUrl, row.audio_name, row.lrc_text);
+  showToast(`"${row.title}" 로드 완료`);
+}
+
+// ─── Load by share code ───
+async function loadProjectByShareCode(code) {
+  showToast('공유 프로젝트 로딩 중...');
+
+  try {
+    const data = await sbFetch('stage_projects', {
+      params: { share_code: `eq.${code.toUpperCase()}`, select: '*' },
+    });
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
+      showToast('프로젝트를 찾을 수 없습니다 — 공유코드를 확인하세요');
+      return false;
+    }
+
+    // Check password
+    if (row.password_hash) {
+      const ok = await verifyProjectPassword(row.password_hash, row.title);
+      if (!ok) {
+        showToast('비밀번호가 일치하지 않습니다');
+        return false;
+      }
+    }
+
+    applyLoadedProject(row);
+    return true;
+  } catch(err) {
+    console.error('[ShareLoad] Error:', err);
+    showToast('로드 실패: ' + (err.message || err));
+    return false;
+  }
+}
+
+// ─── Delete ───
+window.doDeleteProject = async function(id, title) {
+  if (!confirm(`프로젝트를 삭제하시겠습니까?\n"${title}"\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+  try {
+    await sbFetch('stage_projects', {
+      method: 'DELETE',
+      params: { id: `eq.${id}` },
+    });
+
+    if (projectState.id === id) {
+      projectState.id = null;
+      projectState.shareCode = null;
+      projectState.audioStoragePath = null;
+    }
+
+    showToast('프로젝트 삭제됨');
+    const body = document.getElementById('pm-body');
+    if (body) renderListTab(body);
+  } catch(err) {
+    showToast('삭제 실패: ' + (err.message || err));
+  }
+};
+
+// ─── Share existing ───
+window.doShareExisting = function(shareCode, title) {
+  if (!shareCode) {
+    showToast('공유 코드가 없는 프로젝트입니다');
+    return;
+  }
+  navigator.clipboard.writeText(shareCode).then(() => {
+    showToast(`공유코드 ${shareCode} 복사됨 ✓`);
+  }).catch(() => {
+    prompt('공유코드를 복사하세요:', shareCode);
+  });
+};
+
+// ─── Copy share code ───
+window.doCopyShareCode = function() {
+  const code = projectState.shareCode;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('pm-copy-code-btn');
+    if (btn) { btn.textContent = '✓ 복사됨'; btn.classList.add('copied'); }
+    setTimeout(() => { if (btn) { btn.textContent = '📋 코드 복사'; btn.classList.remove('copied'); } }, 2000);
+    showToast('공유코드 복사됨 ✓');
+  }).catch(() => {
+    prompt('공유코드를 복사하세요:', code);
+  });
+};
+
+// ─── Copy share URL ───
+window.doCopyShareUrl = function() {
+  const input = document.getElementById('pm-share-url');
+  if (!input) return;
+  navigator.clipboard.writeText(input.value).then(() => {
+    showToast('공유 링크 복사됨 ✓');
+  }).catch(() => {
+    input.select();
+    document.execCommand('copy');
+    showToast('공유 링크 복사됨 ✓');
+  });
+};
+
+// ─── Edit Project Name ───
+window.editProjectName = function() {
+  const el = document.getElementById('project-name');
+  const newName = prompt('프로젝트 이름:', el.textContent);
+  if (newName && newName.trim()) {
+    projectState.title = newName.trim();
+    el.textContent = projectState.title;
+  }
+};
+
+// ═══════════════════════════════════════════
+//  INTERCEPT FILE UPLOADS FOR PROJECT SAVE
+// ═══════════════════════════════════════════
+
+// Capture audio as blob on upload
+document.getElementById('audio-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    projectState.audioBlob = file;
+    projectState.audioName = file.name;
+    projectState.audioType = file.type;
+    projectState.audioStoragePath = null; // Reset so it re-uploads
+    // Also keep base64 for fallback
+    const reader = new FileReader();
+    reader.onload = () => { projectState.audioDataUrl = reader.result; };
+    reader.readAsDataURL(file);
+  }
+}, true);
+
+// Capture drag & drop audio
+document.getElementById('waveform-area').addEventListener('drop', (e) => {
+  const file = e.dataTransfer?.files[0];
+  if (file && file.type.startsWith('audio/')) {
+    projectState.audioBlob = file;
+    projectState.audioName = file.name;
+    projectState.audioType = file.type;
+    projectState.audioStoragePath = null;
+    const reader = new FileReader();
+    reader.onload = () => { projectState.audioDataUrl = reader.result; };
+    reader.readAsDataURL(file);
+  }
+}, true);
+
+// Capture LRC upload
+document.getElementById('lrc-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => { projectState.lrcText = reader.result; };
+    reader.readAsText(file);
+  }
+}, true);
+
+// ─── Ctrl+S shortcut ───
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (projectState.id) {
+      // Quick save (update existing)
+      doSaveProject(false);
+    } else {
+      openProjectManager('save');
+    }
+  }
+});
+
+// ─── RLS Delete policy (needs to be added) ───
+// Note: If delete fails, run this in Supabase SQL Editor:
+// CREATE POLICY "Anyone can delete projects" ON stage_projects FOR DELETE USING (true);
+
+// ─── Auto-load shared project from URL ───
+(async function checkUrlShare() {
+  const params = new URLSearchParams(window.location.search);
+  const shareCode = params.get('share');
+  if (shareCode) {
+    console.log('[Project] Loading shared:', shareCode);
+    setTimeout(() => loadProjectByShareCode(shareCode), 1500);
+  }
+})();
+</script>
+</body>
+</html>
